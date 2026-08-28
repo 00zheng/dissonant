@@ -1,6 +1,4 @@
-import processorUrl from '@soundtouchjs/audio-worklet/processor?url';
-import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
-
+import SignalsmithStretch from 'signalsmith-stretch';
 export type PlayerStateCallback = (isPlaying: boolean) => void;
 export type TimeUpdateCallback = (currentTime: number) => void;
 export type DurationCallback = (duration: number) => void;
@@ -26,7 +24,7 @@ export class AudioPlayerEngine {
   // Web Audio API graph
   private audioContext: AudioContext | null = null;
   private mediaSourceNode: MediaElementAudioSourceNode | null = null;
-  private soundTouchNode: SoundTouchNode | null = null;
+  private stretchNode: any | null = null;
   private gainNode: GainNode | null = null;
   private isWorkletRegistered: boolean = false;
 
@@ -56,26 +54,20 @@ export class AudioPlayerEngine {
       await this.audioContext.resume();
     }
 
-    if (!this.isWorkletRegistered) {
-      try {
-        await SoundTouchNode.register(this.audioContext, processorUrl);
-        this.isWorkletRegistered = true;
-      } catch (err) {
-        console.error('Failed to register SoundTouchNode worklet:', err);
-        return; // Fallback to normal playback gracefully
-      }
-    }
-
-    if (!this.soundTouchNode && this.isWorkletRegistered) {
+    if (!this.stretchNode) {
       try {
         this.mediaSourceNode = this.audioContext.createMediaElementSource(this.audio);
-        this.soundTouchNode = new SoundTouchNode({ context: this.audioContext });
+        this.stretchNode = await SignalsmithStretch(this.audioContext, { outputChannelCount: [2] });
         this.gainNode = this.audioContext.createGain();
 
-        // Connect graph: AudioElement -> SoundTouch -> Gain -> Destination
-        this.mediaSourceNode.connect(this.soundTouchNode);
-        this.soundTouchNode.connect(this.gainNode);
+        // Connect graph: AudioElement -> SignalsmithStretch -> Gain -> Destination
+        this.mediaSourceNode.connect(this.stretchNode);
+        this.stretchNode.connect(this.gainNode);
         this.gainNode.connect(this.audioContext.destination);
+
+        // Required to start processing
+        this.stretchNode.start();
+        this.isWorkletRegistered = true;
 
         // Apply current states
         this.updateGraphNodes();
@@ -86,11 +78,17 @@ export class AudioPlayerEngine {
   }
 
   private updateGraphNodes() {
-    if (this.soundTouchNode && this.audioContext) {
-      // Use setTargetAtTime to prevent clicks, using a short time constant
-      const now = this.audioContext.currentTime;
-      this.soundTouchNode.pitchSemitones.setTargetAtTime(this.pitchSemitonesState, now, 0.05);
-      this.soundTouchNode.playbackRate.setTargetAtTime(this.playbackRateState, now, 0.05);
+    if (this.stretchNode) {
+      // Calculate independent pitch shift based on current playback speed.
+      // Since <audio> element handles the speed (playbackRate), it shifts pitch by 12*log2(rate).
+      // The SignalsmithStretch node counteracts this so the final pitch matches the requested semitones.
+      const speedPitchShift = 12 * Math.log2(this.playbackRateState);
+      const requiredShift = this.pitchSemitonesState - speedPitchShift;
+      
+      this.stretchNode.schedule({ 
+        semitones: requiredShift,
+        formantCompensation: false
+      });
     }
     
     if (this.gainNode && this.audioContext) {
