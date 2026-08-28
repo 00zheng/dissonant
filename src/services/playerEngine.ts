@@ -439,6 +439,10 @@ export class AudioPlayerEngine {
     this.pitchListeners.add(cb);
     return () => this.pitchListeners.delete(cb);
   }
+
+  public getMediaElement(): HTMLAudioElement {
+    return this.audio;
+  }
 }
 
 // Export singleton instance of player engine

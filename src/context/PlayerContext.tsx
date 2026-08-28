@@ -41,6 +41,9 @@ interface PlayerContextType {
   clearLoop: () => void;
   setPlaybackRate: (rate: number) => void;
   setPitchSemitones: (semitones: number) => void;
+
+  isLoopEditorOpen: boolean;
+  setIsLoopEditorOpen: (isOpen: boolean) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -77,6 +80,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loopA, setLoopAState] = useState<number | null>(null);
   const [loopB, setLoopBState] = useState<number | null>(null);
   const [isLoopActive, setIsLoopActiveState] = useState(false);
+  const [isLoopEditorOpen, setIsLoopEditorOpen] = useState(false);
 
   // Refs
   const currentTrackRef = useRef<Track | null>(null);
@@ -362,6 +366,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearLoop,
         setPlaybackRate,
         setPitchSemitones,
+        
+        isLoopEditorOpen,
+        setIsLoopEditorOpen,
       }}
     >
       {children}

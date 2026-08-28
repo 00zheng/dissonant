@@ -3,6 +3,7 @@ import { usePlayer } from '../../context/PlayerContext';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Gauge, Shuffle, ListMusic } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
 import { QueuePanel } from './QueuePanel';
+import { LoopEditor } from './LoopEditor';
 
 const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -32,6 +33,8 @@ export const PlayerBar: React.FC = () => {
     setPlaybackRate,
     isShuffle,
     toggleShuffle,
+    isLoopEditorOpen,
+    setIsLoopEditorOpen,
   } = usePlayer();
 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -193,36 +196,16 @@ export const PlayerBar: React.FC = () => {
           {/* A-B Looping Control Group (Desktop) */}
           <div className="hidden lg:flex items-center gap-1 bg-[#131313] border border-[#282828] rounded-[4px] p-0.5 text-[10px] font-mono">
             <button
-              onClick={() => setLoopA()}
-              className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer ${
-                loopA !== null ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
-              }`}
-              title="Set Loop Point A"
-            >
-              A{loopA !== null ? `:${formatTime(loopA)}` : ''}
-            </button>
-
-            <button
-              onClick={() => setLoopB()}
-              className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer ${
-                loopB !== null ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
-              }`}
-              title="Set Loop Point B"
-            >
-              B{loopB !== null ? `:${formatTime(loopB)}` : ''}
-            </button>
-
-            <button
-              onClick={toggleLoopActive}
-              className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer flex items-center gap-1 ${
+              onClick={() => setIsLoopEditorOpen(true)}
+              className={`px-2 py-0.5 rounded-[3px] transition-colors cursor-pointer flex items-center gap-1.5 ${
                 isLoopActive ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
               }`}
-              title={isLoopActive ? 'A-B Loop ON' : 'A-B Loop OFF'}
+              title="Open Loop Editor"
             >
               <Repeat className="w-3 h-3" />
-              <span>{isLoopActive ? 'ON' : 'OFF'}</span>
+              <span>A-B {isLoopActive ? 'ON' : 'OFF'}</span>
             </button>
-
+            
             {(loopA !== null || loopB !== null) && (
               <button
                 onClick={clearLoop}
@@ -262,6 +245,7 @@ export const PlayerBar: React.FC = () => {
       </div>
 
       <QueuePanel isOpen={isQueuePanelOpen} onClose={() => setIsQueuePanelOpen(false)} />
+      <LoopEditor />
     </div>
   );
 };
