@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Track, Project } from '../types';
+import { playerEngine } from '../services/playerEngine';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -27,118 +28,137 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMutedState] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Refs for tracking current values inside callbacks
+  const currentTrackRef = useRef<Track | null>(null);
+  const currentProjectRef = useRef<Project | null>(null);
 
   useEffect(() => {
-    const audio = new Audio();
-    audioRef.current = audio;
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      if (audio.duration) {
-        setDuration(audio.duration);
+  useEffect(() => {
+    currentProjectRef.current = currentProject;
+  }, [currentProject]);
+
+  // Subscribe to Player Engine events
+  useEffect(() => {
+    const unsubState = playerEngine.onStateChange((playing) => {
+      setIsPlaying(playing);
+    });
+
+    const unsubTime = playerEngine.onTimeUpdate((time) => {
+      setCurrentTime(time);
+    });
+
+    const unsubDuration = playerEngine.onDurationChange((dur) => {
+      setDuration(dur);
+    });
+
+    const unsubEnded = playerEngine.onEnded(() => {
+      // Auto-advance to next track in project track order
+      const proj = currentProjectRef.current;
+      const track = currentTrackRef.current;
+      if (proj && track && proj.tracks) {
+        const idx = proj.tracks.findIndex((t) => t.id === track.id);
+        if (idx !== -1 && idx < proj.tracks.length - 1) {
+          const nextTrack = proj.tracks[idx + 1];
+          setCurrentTrack(nextTrack);
+          setDuration(nextTrack.duration || 0);
+          setCurrentTime(0);
+          playerEngine.loadAndPlay(nextTrack.audioUrl);
+          return;
+        }
       }
-    };
-
-    const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
-    };
-
-    const handleError = () => {
-      console.warn('Audio play error, falling back to timer simulation');
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError);
+    });
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError);
-      audio.pause();
+      unsubState();
+      unsubTime();
+      unsubDuration();
+      unsubEnded();
     };
   }, []);
 
-  // Sync volume & mute
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  const playTrack = (track: Track, project?: Project) => {
-    if (currentTrack?.id === track.id) {
-      togglePlay();
+  const playTrack = useCallback((track: Track, project?: Project) => {
+    if (currentTrackRef.current?.id === track.id) {
+      playerEngine.togglePlay();
       return;
     }
 
     setCurrentTrack(track);
-    if (project) setCurrentProject(project);
-    setDuration(track.duration);
+    if (project) {
+      setCurrentProject(project);
+    }
+    setDuration(track.duration || 0);
     setCurrentTime(0);
 
-    if (audioRef.current) {
-      audioRef.current.src = track.audioUrl;
-      audioRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(err => {
-        console.log('Audio playback prevented or error:', err);
-        // Still visually show play state
-        setIsPlaying(true);
-      });
-    }
-  };
+    playerEngine.loadAndPlay(track.audioUrl);
+  }, []);
 
-  const togglePlay = () => {
-    if (!currentTrack) return;
+  const togglePlay = useCallback(() => {
+    if (!currentTrackRef.current) return;
+    playerEngine.togglePlay();
+  }, []);
 
-    if (isPlaying) {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current?.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        setIsPlaying(true);
-      });
-    }
-  };
+  const seek = useCallback((seconds: number) => {
+    playerEngine.seek(seconds);
+    setCurrentTime(seconds);
+  }, []);
 
-  const seek = (seconds: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = seconds;
-      setCurrentTime(seconds);
-    }
-  };
-
-  const setVolume = (vol: number) => {
+  const setVolume = useCallback((vol: number) => {
     setVolumeState(vol);
-    if (vol > 0 && isMuted) setIsMuted(false);
-  };
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-  };
-
-  const playNext = () => {
-    if (!currentProject || !currentTrack) return;
-    const currentIndex = currentProject.tracks.findIndex(t => t.id === currentTrack.id);
-    if (currentIndex !== -1 && currentIndex < currentProject.tracks.length - 1) {
-      playTrack(currentProject.tracks[currentIndex + 1], currentProject);
+    playerEngine.setVolume(vol);
+    if (vol > 0 && isMuted) {
+      setIsMutedState(false);
     }
-  };
+  }, [isMuted]);
 
-  const playPrevious = () => {
-    if (!currentProject || !currentTrack) return;
-    const currentIndex = currentProject.tracks.findIndex(t => t.id === currentTrack.id);
-    if (currentIndex > 0) {
-      playTrack(currentProject.tracks[currentIndex - 1], currentProject);
+  const toggleMute = useCallback(() => {
+    const nextMuted = !isMuted;
+    setIsMutedState(nextMuted);
+    playerEngine.setMuted(nextMuted);
+  }, [isMuted]);
+
+  const playNext = useCallback(() => {
+    const proj = currentProjectRef.current;
+    const track = currentTrackRef.current;
+    if (!proj || !track || !proj.tracks || proj.tracks.length === 0) return;
+
+    const idx = proj.tracks.findIndex((t) => t.id === track.id);
+    if (idx !== -1 && idx < proj.tracks.length - 1) {
+      const nextTrack = proj.tracks[idx + 1];
+      playTrack(nextTrack, proj);
+    } else {
+      // Loop back to first track in project
+      playTrack(proj.tracks[0], proj);
     }
-  };
+  }, [playTrack]);
+
+  const playPrevious = useCallback(() => {
+    const proj = currentProjectRef.current;
+    const track = currentTrackRef.current;
+    if (!proj || !track || !proj.tracks || proj.tracks.length === 0) return;
+
+    // If more than 3 seconds elapsed, restart current track
+    if (playerEngine.getCurrentTime() > 3) {
+      playerEngine.seek(0);
+      setCurrentTime(0);
+      return;
+    }
+
+    const idx = proj.tracks.findIndex((t) => t.id === track.id);
+    if (idx > 0) {
+      const prevTrack = proj.tracks[idx - 1];
+      playTrack(prevTrack, proj);
+    } else {
+      // Go to last track in project
+      playTrack(proj.tracks[proj.tracks.length - 1], proj);
+    }
+  }, [playTrack]);
 
   return (
     <PlayerContext.Provider
@@ -156,7 +176,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setVolume,
         toggleMute,
         playNext,
-        playPrevious
+        playPrevious,
       }}
     >
       {children}
