@@ -1,17 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Project } from '../../types';
 import { Card } from '../ui/Card';
-import { Play } from 'lucide-react';
+import { Play, MoreVertical, Edit2, FolderInput, Trash2 } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 
 interface ProjectCardProps {
   project: Project;
   onClick: (project: Project) => void;
+  onEditProject?: (project: Project) => void;
+  onMoveProject?: (project: Project) => void;
+  onDeleteProject?: (project: Project) => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({
+  project,
+  onClick,
+  onEditProject,
+  onMoveProject,
+  onDeleteProject,
+}) => {
   const { playTrack, currentProject, isPlaying } = usePlayer();
   const isCurrentPlayingProject = currentProject?.id === project.id && isPlaying;
+  const [showMenu, setShowMenu] = useState(false);
 
   const handlePlayHero = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -20,12 +30,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
     }
   };
 
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(!showMenu);
+  };
+
   return (
     <Card
       variant="low"
       hoverEffect
       onClick={() => onClick(project)}
-      className="flex flex-col h-full group border-[#282828] hover:border-[#353534] transition-colors rounded-[8px] overflow-hidden bg-[#1C1B1B]"
+      className="flex flex-col h-full group border-[#282828] hover:border-[#353534] transition-colors rounded-[8px] overflow-hidden bg-[#1C1B1B] relative"
     >
       {/* Artwork Container - Visually Dominant */}
       <div className="relative aspect-square w-full bg-[#131313] overflow-hidden">
@@ -50,6 +65,68 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
         {isCurrentPlayingProject && (
           <div className="absolute bottom-3 right-3 bg-[#FF3B00] w-3 h-3 rounded-full shadow-md" />
         )}
+
+        {/* Category tag on cover top left */}
+        <div className="absolute top-3 left-3 bg-[#0E0E0E]/80 backdrop-blur-xs px-2 py-0.5 rounded-[4px] border border-[#282828] text-[10px] uppercase font-bold text-[#E5E2E1] tracking-wider">
+          {project.category}
+        </div>
+
+        {/* Project Context Menu */}
+        {(onEditProject || onMoveProject || onDeleteProject) && (
+          <div className="absolute top-3 right-3 z-10">
+            <button
+              onClick={handleMenuClick}
+              className="p-1.5 rounded-[4px] bg-[#0E0E0E]/80 backdrop-blur-xs border border-[#282828] text-[#E5E2E1] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
+              title="Project Options"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            {showMenu && (
+              <div
+                className="absolute right-0 top-8 w-40 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs z-30"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {onEditProject && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onEditProject(project);
+                    }}
+                    className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Rename</span>
+                  </button>
+                )}
+                {onMoveProject && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onMoveProject(project);
+                    }}
+                    className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
+                  >
+                    <FolderInput className="w-3.5 h-3.5" />
+                    <span>Move to Folder</span>
+                  </button>
+                )}
+                {onDeleteProject && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onDeleteProject(project);
+                    }}
+                    className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Info Block */}
@@ -63,7 +140,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
           </p>
         </div>
 
-        <div className="mt-3 pt-2 flex items-center justify-between text-xs text-[#E8BDB3]/50">
+        <div className="mt-3 pt-2 flex items-center justify-between text-xs text-[#E8BDB3]/50 border-t border-[#282828]">
           <span>{project.tracksCount} tracks</span>
           <span>{project.totalDuration}</span>
         </div>
@@ -71,4 +148,3 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onClick }) =>
     </Card>
   );
 };
-

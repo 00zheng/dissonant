@@ -1,6 +1,6 @@
 import React from 'react';
 import { Library, Folder, Disc, Settings, Plus } from 'lucide-react';
-import { ViewMode } from '../../types';
+import { Project, ViewMode } from '../../types';
 import { clsx } from 'clsx';
 
 interface SidebarProps {
@@ -8,19 +8,27 @@ interface SidebarProps {
   onNavigate: (view: ViewMode) => void;
   activeFilter?: string;
   onFilterSelect?: (filter: string) => void;
+  onCreateProject?: () => void;
+  projects?: Project[];
+  onProjectSelect?: (project: Project) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onNavigate,
   activeFilter = 'All',
-  onFilterSelect
+  onFilterSelect,
+  onCreateProject,
+  projects = [],
+  onProjectSelect,
 }) => {
   const mainNavItems = [
     { id: 'library', label: 'Library', icon: Library },
     { id: 'folders', label: 'Folders', icon: Folder },
     { id: 'albums', label: 'Projects', icon: Disc },
   ];
+
+  const recentProjects = projects.slice(0, 5);
 
   return (
     <aside className="w-64 bg-[#0E0E0E] border-r border-[#282828] h-full flex flex-col justify-between select-none">
@@ -41,7 +49,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Action Button */}
         <div className="p-4">
           <button
-            onClick={() => onNavigate('library')}
+            onClick={() => {
+              if (onCreateProject) {
+                onCreateProject();
+              } else {
+                onNavigate('library');
+              }
+            }}
             className="w-full bg-[#E5E2E1] hover:bg-white text-black font-semibold py-2.5 px-4 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wide transition-all cursor-pointer shadow-sm"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -86,20 +100,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Recent Projects
             </div>
             <div className="space-y-1 text-xs">
-              <button
-                onClick={() => onNavigate('library')}
-                className="w-full text-left px-3 py-1.5 text-[#E8BDB3]/70 hover:text-white truncate transition-colors cursor-pointer flex items-center justify-between"
-              >
-                <span className="truncate">Synthetic After Dark</span>
-                <span className="text-[11px] text-[#E8BDB3]/50">8</span>
-              </button>
-              <button
-                onClick={() => onNavigate('library')}
-                className="w-full text-left px-3 py-1.5 text-[#E8BDB3]/70 hover:text-white truncate transition-colors cursor-pointer flex items-center justify-between"
-              >
-                <span className="truncate">Echo Chamber EP</span>
-                <span className="text-[11px] text-[#E8BDB3]/50">4</span>
-              </button>
+              {recentProjects.map((proj) => (
+                <button
+                  key={proj.id}
+                  onClick={() => {
+                    if (onProjectSelect) {
+                      onProjectSelect(proj);
+                    } else {
+                      onNavigate('library');
+                    }
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-[#E8BDB3]/70 hover:text-white truncate transition-colors cursor-pointer flex items-center justify-between"
+                >
+                  <span className="truncate">{proj.title}</span>
+                  <span className="text-[11px] text-[#E8BDB3]/50">{proj.tracksCount || proj.tracks.length}</span>
+                </button>
+              ))}
+              {recentProjects.length === 0 && (
+                <p className="px-3 text-[11px] text-[#E8BDB3]/40">No projects yet</p>
+              )}
             </div>
           </div>
         </div>
@@ -122,4 +141,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-

@@ -5,28 +5,40 @@ import { TrackList } from '../components/project/TrackList';
 
 interface ProjectDetailViewProps {
   project: Project;
+  onEditProject?: (project: Project) => void;
+  onMoveProject?: (project: Project) => void;
+  onDeleteProject?: (project: Project) => void;
 }
 
-export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ project }) => {
+export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
+  project,
+  onEditProject,
+  onMoveProject,
+  onDeleteProject,
+}) => {
   return (
     <div className="pb-36 space-y-8">
       {/* Project Header */}
-      <ProjectHeader project={project} />
+      <ProjectHeader
+        project={project}
+        onEditProject={onEditProject}
+        onMoveProject={onMoveProject}
+        onDeleteProject={onDeleteProject}
+      />
 
       {/* Main Track List Container */}
       <div className="py-6 px-6 lg:px-12 max-w-7xl mx-auto space-y-4">
         <div className="flex items-center justify-between border-b border-[#282828] pb-3">
           <h2 className="text-lg font-semibold text-[#E5E2E1]">Tracks</h2>
           <span className="text-xs text-[#E8BDB3]/50">
-            {project.tracks.length} tracks
+            {project.tracks ? project.tracks.length : 0} tracks
           </span>
         </div>
 
         <div className="bg-[#131313] border border-[#282828] rounded-[8px] overflow-hidden">
-          <TrackList tracks={project.tracks} project={project} />
+          <TrackList tracks={project.tracks || []} project={project} />
         </div>
       </div>
     </div>
   );
 };
-

@@ -1,16 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Project } from '../../types';
 import { Button } from '../ui/Button';
-import { Play, Pause, Shuffle, Plus, MoreHorizontal } from 'lucide-react';
+import { Play, Pause, Shuffle, Plus, MoreHorizontal, Edit2, FolderInput, Trash2 } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 
 interface ProjectHeaderProps {
   project: Project;
+  onEditProject?: (project: Project) => void;
+  onMoveProject?: (project: Project) => void;
+  onDeleteProject?: (project: Project) => void;
 }
 
-export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
+export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
+  project,
+  onEditProject,
+  onMoveProject,
+  onDeleteProject,
+}) => {
   const { currentProject, isPlaying, playTrack, togglePlay } = usePlayer();
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
+  const [showMenu, setShowMenu] = useState(false);
 
   const handleMainPlay = () => {
     if (isPlayingThisProject) {
@@ -71,7 +80,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
           </div>
 
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center gap-3 pt-3">
+          <div className="flex flex-wrap items-center gap-3 pt-3 relative">
             <Button
               variant="accent"
               size="md"
@@ -101,13 +110,64 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
               <span>Add Songs</span>
             </Button>
 
-            <button className="p-2 text-[#E8BDB3]/60 hover:text-white rounded-[4px] border border-[#282828] hover:bg-[#1C1B1B] transition-colors cursor-pointer ml-auto">
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+            {(onEditProject || onMoveProject || onDeleteProject) && (
+              <div className="relative ml-auto">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 text-[#E8BDB3]/60 hover:text-white rounded-[4px] border border-[#282828] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
+                  title="Project Options"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+
+                {showMenu && (
+                  <div
+                    className="absolute right-0 top-11 z-30 w-44 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {onEditProject && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onEditProject(project);
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        <span>Rename Project</span>
+                      </button>
+                    )}
+                    {onMoveProject && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onMoveProject(project);
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <FolderInput className="w-4 h-4" />
+                        <span>Move to Folder</span>
+                      </button>
+                    )}
+                    {onDeleteProject && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onDeleteProject(project);
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Project</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
-
