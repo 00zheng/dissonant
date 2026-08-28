@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePlayer } from '../../context/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Repeat } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
 import { PlayerExpanded } from './PlayerExpanded';
 
@@ -18,7 +18,14 @@ export const PlayerBar: React.FC = () => {
     isMuted,
     toggleMute,
     playNext,
-    playPrevious
+    playPrevious,
+    loopA,
+    loopB,
+    isLoopActive,
+    setLoopA,
+    setLoopB,
+    toggleLoopActive,
+    clearLoop,
   } = usePlayer();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -32,6 +39,8 @@ export const PlayerBar: React.FC = () => {
   };
 
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+  const loopAPct = duration && loopA !== null ? (loopA / duration) * 100 : undefined;
+  const loopBPct = duration && loopB !== null ? (loopB / duration) * 100 : undefined;
 
   return (
     <>
@@ -43,6 +52,9 @@ export const PlayerBar: React.FC = () => {
             onChange={(pct) => seek((pct / 100) * duration)}
             height={2}
             className="!py-0 h-[2px]"
+            loopAStartPct={loopAPct}
+            loopBEndPct={loopBPct}
+            isLoopActive={isLoopActive}
           />
         </div>
 
@@ -114,9 +126,53 @@ export const PlayerBar: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Volume & Expand */}
-          <div className="flex items-center justify-end gap-3 w-1/3 max-w-[280px]">
-            <div className="hidden sm:flex items-center gap-2 w-28">
+          {/* Right: A-B Loop Controls, Volume & Expand */}
+          <div className="flex items-center justify-end gap-3 w-1/3 max-w-[340px]">
+            {/* A-B Looping Control Group */}
+            <div className="hidden lg:flex items-center gap-1 bg-[#131313] border border-[#282828] rounded-[4px] p-0.5 text-[10px] font-mono">
+              <button
+                onClick={() => setLoopA()}
+                className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer ${
+                  loopA !== null ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
+                }`}
+                title="Set Loop Point A"
+              >
+                A{loopA !== null ? `:${formatTime(loopA)}` : ''}
+              </button>
+
+              <button
+                onClick={() => setLoopB()}
+                className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer ${
+                  loopB !== null ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
+                }`}
+                title="Set Loop Point B"
+              >
+                B{loopB !== null ? `:${formatTime(loopB)}` : ''}
+              </button>
+
+              <button
+                onClick={toggleLoopActive}
+                className={`px-1.5 py-0.5 rounded-[3px] transition-colors cursor-pointer flex items-center gap-1 ${
+                  isLoopActive ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
+                }`}
+                title={isLoopActive ? 'A-B Loop ON' : 'A-B Loop OFF'}
+              >
+                <Repeat className="w-3 h-3" />
+                <span>{isLoopActive ? 'ON' : 'OFF'}</span>
+              </button>
+
+              {(loopA !== null || loopB !== null) && (
+                <button
+                  onClick={clearLoop}
+                  className="px-1.5 py-0.5 text-[#FF3B00] hover:bg-[#2A2A2A] rounded-[3px] cursor-pointer"
+                  title="Clear A-B Loop"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 w-24">
               <button onClick={toggleMute} className="text-[#E8BDB3]/60 hover:text-white cursor-pointer">
                 {isMuted || volume === 0 ? (
                   <VolumeX className="w-4 h-4 text-[#FF3B00]" />
@@ -147,4 +203,3 @@ export const PlayerBar: React.FC = () => {
     </>
   );
 };
-

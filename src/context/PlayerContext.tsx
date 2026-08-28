@@ -10,6 +10,9 @@ interface PlayerContextType {
   duration: number;
   volume: number;
   isMuted: boolean;
+  loopA: number | null;
+  loopB: number | null;
+  isLoopActive: boolean;
   playTrack: (track: Track, project?: Project) => void;
   togglePlay: () => void;
   seek: (seconds: number) => void;
@@ -17,6 +20,10 @@ interface PlayerContextType {
   toggleMute: () => void;
   playNext: () => void;
   playPrevious: () => void;
+  setLoopA: (time?: number) => void;
+  setLoopB: (time?: number) => void;
+  toggleLoopActive: () => void;
+  clearLoop: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -29,6 +36,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMutedState] = useState(false);
+
+  // A-B Loop States
+  const [loopA, setLoopAState] = useState<number | null>(null);
+  const [loopB, setLoopBState] = useState<number | null>(null);
+  const [isLoopActive, setIsLoopActiveState] = useState(false);
 
   // Refs for tracking current values inside callbacks
   const currentTrackRef = useRef<Track | null>(null);
@@ -56,6 +68,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setDuration(dur);
     });
 
+    const unsubLoop = playerEngine.onLoopChange((a, b, active) => {
+      setLoopAState(a);
+      setLoopBState(b);
+      setIsLoopActiveState(active);
+    });
+
     const unsubEnded = playerEngine.onEnded(() => {
       // Auto-advance to next track in project track order
       const proj = currentProjectRef.current;
@@ -79,6 +97,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubState();
       unsubTime();
       unsubDuration();
+      unsubLoop();
       unsubEnded();
     };
   }, []);
@@ -133,7 +152,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const nextTrack = proj.tracks[idx + 1];
       playTrack(nextTrack, proj);
     } else {
-      // Loop back to first track in project
       playTrack(proj.tracks[0], proj);
     }
   }, [playTrack]);
@@ -143,7 +161,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const track = currentTrackRef.current;
     if (!proj || !track || !proj.tracks || proj.tracks.length === 0) return;
 
-    // If more than 3 seconds elapsed, restart current track
     if (playerEngine.getCurrentTime() > 3) {
       playerEngine.seek(0);
       setCurrentTime(0);
@@ -155,10 +172,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const prevTrack = proj.tracks[idx - 1];
       playTrack(prevTrack, proj);
     } else {
-      // Go to last track in project
       playTrack(proj.tracks[proj.tracks.length - 1], proj);
     }
   }, [playTrack]);
+
+  // A-B Looping Callbacks
+  const setLoopA = useCallback((time?: number) => {
+    playerEngine.setLoopA(time);
+  }, []);
+
+  const setLoopB = useCallback((time?: number) => {
+    playerEngine.setLoopB(time);
+  }, []);
+
+  const toggleLoopActive = useCallback(() => {
+    playerEngine.toggleLoopActive();
+  }, []);
+
+  const clearLoop = useCallback(() => {
+    playerEngine.clearLoop();
+  }, []);
 
   return (
     <PlayerContext.Provider
@@ -170,6 +203,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         duration: duration || (currentTrack?.duration ?? 0),
         volume,
         isMuted,
+        loopA,
+        loopB,
+        isLoopActive,
         playTrack,
         togglePlay,
         seek,
@@ -177,6 +213,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleMute,
         playNext,
         playPrevious,
+        setLoopA,
+        setLoopB,
+        toggleLoopActive,
+        clearLoop,
       }}
     >
       {children}

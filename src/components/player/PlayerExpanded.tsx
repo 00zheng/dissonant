@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePlayer } from '../../context/PlayerContext';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Shuffle, Layers } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Shuffle } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
 
 interface PlayerExpandedProps {
@@ -21,7 +21,14 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
     isMuted,
     toggleMute,
     playNext,
-    playPrevious
+    playPrevious,
+    loopA,
+    loopB,
+    isLoopActive,
+    setLoopA,
+    setLoopB,
+    toggleLoopActive,
+    clearLoop,
   } = usePlayer();
 
   if (!currentTrack) return null;
@@ -33,9 +40,11 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
   };
 
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+  const loopAPct = duration && loopA !== null ? (loopA / duration) * 100 : undefined;
+  const loopBPct = duration && loopB !== null ? (loopB / duration) * 100 : undefined;
 
   return (
-    <div className="fixed inset-0 bg-[#000000]/95 backdrop-blur-xl z-50 flex flex-col justify-between p-6 md:p-12 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-[#000000]/95 backdrop-blur-xl z-50 flex flex-col justify-between p-6 md:p-12 animate-in fade-in duration-200 select-none">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -86,6 +95,9 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
               value={progressPercent}
               onChange={(pct) => seek((pct / 100) * duration)}
               height={4}
+              loopAStartPct={loopAPct}
+              loopBEndPct={loopBPct}
+              isLoopActive={isLoopActive}
             />
             <div className="flex justify-between font-mono-label text-xs text-[#E8BDB3]/60">
               <span>{formatTime(currentTime)}</span>
@@ -93,8 +105,65 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Primary Controls */}
-          <div className="flex items-center justify-center gap-6 pt-4">
+          {/* A-B Section Looping Control Panel */}
+          <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
+                A-B Section Looping
+              </span>
+              {isLoopActive && (
+                <span className="px-2 py-0.5 rounded-[3px] bg-[#FF3B00] text-white text-[10px] uppercase font-bold tracking-wider animate-pulse">
+                  Loop Active
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              <button
+                onClick={() => setLoopA()}
+                className={`py-2 px-3 rounded-[4px] border font-mono transition-colors cursor-pointer text-center ${
+                  loopA !== null
+                    ? 'bg-[#FF3B00]/20 border-[#FF3B00] text-[#FF3B00] font-bold'
+                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
+                }`}
+              >
+                Set A {loopA !== null ? `(${formatTime(loopA)})` : ''}
+              </button>
+
+              <button
+                onClick={() => setLoopB()}
+                className={`py-2 px-3 rounded-[4px] border font-mono transition-colors cursor-pointer text-center ${
+                  loopB !== null
+                    ? 'bg-[#FF3B00]/20 border-[#FF3B00] text-[#FF3B00] font-bold'
+                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
+                }`}
+              >
+                Set B {loopB !== null ? `(${formatTime(loopB)})` : ''}
+              </button>
+
+              <button
+                onClick={toggleLoopActive}
+                className={`py-2 px-3 rounded-[4px] border font-semibold transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                  isLoopActive
+                    ? 'bg-[#FF3B00] border-[#FF3B00] text-white'
+                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
+                }`}
+              >
+                <Repeat className="w-4 h-4" />
+                <span>{isLoopActive ? 'Loop ON' : 'Loop OFF'}</span>
+              </button>
+
+              <button
+                onClick={clearLoop}
+                className="py-2 px-3 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white hover:border-[#5E3F38] transition-colors cursor-pointer text-center"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Primary Playback Controls */}
+          <div className="flex items-center justify-center gap-6 pt-2">
             <button className="text-[#E8BDB3]/50 hover:text-white transition-colors cursor-pointer">
               <Shuffle className="w-5 h-5" />
             </button>
@@ -120,9 +189,6 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
             >
               <SkipForward className="w-6 h-6 fill-current" />
             </button>
-            <button className="text-[#E8BDB3]/50 hover:text-white transition-colors cursor-pointer">
-              <Repeat className="w-5 h-5" />
-            </button>
           </div>
 
           {/* Volume Slider */}
@@ -142,7 +208,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
       {/* Footer Meta */}
       <div className="flex items-center justify-between font-mono-label text-xs text-[#E8BDB3]/40 border-t border-[#282828] pt-4">
         <span>PROJECT: {currentProject?.title ?? 'STANDALONE TRACK'}</span>
-        <span>AUDIO ENGINE: HIGH-RES STEREO</span>
+        <span>AUDIO ENGINE: A-B LOOP ACTIVE ({isLoopActive ? 'YES' : 'NO'})</span>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ export type TimeUpdateCallback = (currentTime: number) => void;
 export type DurationCallback = (duration: number) => void;
 export type EndedCallback = () => void;
 export type ErrorCallback = (error: any) => void;
+export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
 
 export class AudioPlayerEngine {
   private audio: HTMLAudioElement;
@@ -10,11 +11,17 @@ export class AudioPlayerEngine {
   private volumeState: number = 0.8;
   private isMutedState: boolean = false;
 
+  // A-B Looping State
+  private loopAState: number | null = null;
+  private loopBState: number | null = null;
+  private isLoopActiveState: boolean = false;
+
   private stateListeners: Set<PlayerStateCallback> = new Set();
   private timeListeners: Set<TimeUpdateCallback> = new Set();
   private durationListeners: Set<DurationCallback> = new Set();
   private endedListeners: Set<EndedCallback> = new Set();
   private errorListeners: Set<ErrorCallback> = new Set();
+  private loopListeners: Set<LoopStateCallback> = new Set();
 
   constructor() {
     this.audio = new Audio();
@@ -25,12 +32,32 @@ export class AudioPlayerEngine {
   private setupEventListeners() {
     this.audio.addEventListener('timeupdate', () => {
       const time = this.audio.currentTime || 0;
+
+      // Enforce A-B loop boundary if active
+      if (
+        this.isLoopActiveState &&
+        this.loopAState !== null &&
+        this.loopBState !== null &&
+        this.loopAState < this.loopBState
+      ) {
+        if (time >= this.loopBState || time < this.loopAState) {
+          this.audio.currentTime = this.loopAState;
+          this.timeListeners.forEach((cb) => cb(this.loopAState!));
+          return;
+        }
+      }
+
       this.timeListeners.forEach((cb) => cb(time));
     });
 
     this.audio.addEventListener('durationchange', () => {
       const dur = this.audio.duration;
       if (dur && !isNaN(dur)) {
+        // Clamp loopB to duration if it exceeded
+        if (this.loopBState !== null && this.loopBState > dur) {
+          this.loopBState = dur;
+          this.notifyLoopChange();
+        }
         this.durationListeners.forEach((cb) => cb(dur));
       }
     });
@@ -62,8 +89,16 @@ export class AudioPlayerEngine {
     this.stateListeners.forEach((cb) => cb(this.isPlayingState));
   }
 
+  private notifyLoopChange() {
+    this.loopListeners.forEach((cb) =>
+      cb(this.loopAState, this.loopBState, this.isLoopActiveState)
+    );
+  }
+
   public async loadAndPlay(src: string, startTime: number = 0): Promise<void> {
+    // Reset loop when changing tracks
     if (this.audio.src !== src) {
+      this.clearLoop();
       this.audio.src = src;
       this.audio.currentTime = startTime;
     }
@@ -105,7 +140,20 @@ export class AudioPlayerEngine {
 
   public seek(seconds: number): void {
     if (isNaN(seconds) || seconds < 0) return;
-    const targetTime = Math.min(seconds, this.audio.duration || seconds);
+    const dur = this.audio.duration || seconds;
+    let targetTime = Math.min(seconds, dur);
+
+    // If A-B loop is active and user seeks outside [loopA, loopB], re-align to loopA
+    if (
+      this.isLoopActiveState &&
+      this.loopAState !== null &&
+      this.loopBState !== null
+    ) {
+      if (targetTime < this.loopAState || targetTime > this.loopBState) {
+        targetTime = this.loopAState;
+      }
+    }
+
     this.audio.currentTime = targetTime;
     this.timeListeners.forEach((cb) => cb(targetTime));
   }
@@ -148,6 +196,77 @@ export class AudioPlayerEngine {
     return this.isPlayingState;
   }
 
+  // --- A-B Looping Methods ---
+
+  public setLoopA(time?: number): void {
+    const dur = this.getDuration();
+    let val = time !== undefined ? time : this.getCurrentTime();
+    val = Math.max(0, Math.min(dur || val, val));
+
+    // Handle edge case: A set at or after B
+    if (this.loopBState !== null && val >= this.loopBState) {
+      this.loopBState = Math.min(dur || val + 5, val + 2);
+    }
+
+    this.loopAState = val;
+    this.notifyLoopChange();
+  }
+
+  public setLoopB(time?: number): void {
+    const dur = this.getDuration();
+    let val = time !== undefined ? time : this.getCurrentTime();
+    // Clamp B to duration
+    if (dur && val > dur) {
+      val = dur;
+    }
+    val = Math.max(0, val);
+
+    // Handle edge case: B set at or before A
+    if (this.loopAState !== null && val <= this.loopAState) {
+      this.loopAState = Math.max(0, val - 2);
+    }
+
+    this.loopBState = val;
+    this.notifyLoopChange();
+  }
+
+  public toggleLoopActive(): void {
+    this.isLoopActiveState = !this.isLoopActiveState;
+
+    // If turning ON and A/B not set, default A to 0 and B to duration/current
+    if (this.isLoopActiveState) {
+      const dur = this.getDuration();
+      if (this.loopAState === null) {
+        this.loopAState = 0;
+      }
+      if (this.loopBState === null) {
+        this.loopBState = dur || 10;
+      }
+      // If currentTime is outside [loopA, loopB], jump to loopA
+      const curr = this.getCurrentTime();
+      if (curr < this.loopAState || curr > this.loopBState) {
+        this.seek(this.loopAState);
+      }
+    }
+
+    this.notifyLoopChange();
+  }
+
+  public clearLoop(): void {
+    this.loopAState = null;
+    this.loopBState = null;
+    this.isLoopActiveState = false;
+    this.notifyLoopChange();
+  }
+
+  public getLoopState(): { loopA: number | null; loopB: number | null; isLoopActive: boolean } {
+    return {
+      loopA: this.loopAState,
+      loopB: this.loopBState,
+      isLoopActive: this.isLoopActiveState,
+    };
+  }
+
   // --- Subscriptions ---
 
   public onStateChange(cb: PlayerStateCallback): () => void {
@@ -173,6 +292,11 @@ export class AudioPlayerEngine {
   public onError(cb: ErrorCallback): () => void {
     this.errorListeners.add(cb);
     return () => this.errorListeners.delete(cb);
+  }
+
+  public onLoopChange(cb: LoopStateCallback): () => void {
+    this.loopListeners.add(cb);
+    return () => this.loopListeners.delete(cb);
   }
 }
 
