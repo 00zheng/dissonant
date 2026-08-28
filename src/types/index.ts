@@ -38,4 +38,12 @@ export interface Folder {
   updatedAt: string;
 }
 
-export type ViewMode = 'library' | 'folder_detail' | 'project_detail' | 'search';
+export type ViewMode = 'library' | 'folders' | 'projects' | 'folder_detail' | 'project_detail' | 'search';
+
+export type RouteState =
+  | { type: 'library' }
+  | { type: 'folders' }
+  | { type: 'folder_detail'; folderId: string }
+  | { type: 'projects' }
+  | { type: 'project_detail'; projectId: string };
+

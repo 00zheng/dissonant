@@ -6,6 +6,9 @@ import { Header } from './components/layout/Header';
 import { MobileNav } from './components/layout/MobileNav';
 import { PlayerBar } from './components/player/PlayerBar';
 import { LibraryView } from './views/LibraryView';
+import { FoldersView } from './views/FoldersView';
+import { ProjectsView } from './views/ProjectsView';
+import { FolderDetailView } from './views/FolderDetailView';
 import { ProjectDetailView } from './views/ProjectDetailView';
 import { FolderModal } from './components/ui/FolderModal';
 import { ProjectModal } from './components/ui/ProjectModal';
@@ -14,7 +17,7 @@ import { ConfirmModal } from './components/ui/ConfirmModal';
 import { UploadTrackModal } from './components/ui/UploadTrackModal';
 import { TrackModal } from './components/ui/TrackModal';
 import { AuthModal } from './components/auth/AuthModal';
-import { Folder, Project, Track, ViewMode } from './types';
+import { Folder, Project, Track, ViewMode, RouteState } from './types';
 import {
   initUserData,
   fsSaveFolder,
@@ -24,10 +27,50 @@ import {
   fsMoveProject,
   fsDeleteTrack,
   fsReorderTracks,
-  dbSaveAudioBlob,
 } from './services/db';
-import { processAudioUpload, formatTotalDuration } from './services/audio';
-import { LogIn, Lock, Music2, ShieldCheck, Database, Loader2 } from 'lucide-react';
+import { formatTotalDuration } from './services/audio';
+import { LogIn, Lock, Music2, ShieldCheck, Database, Loader2, ArrowLeft } from 'lucide-react';
+
+function parseRoute(pathname: string): RouteState {
+  const cleanPath = pathname.replace(/\/+$/, '') || '/';
+
+  if (cleanPath === '/' || cleanPath === '/library') {
+    return { type: 'library' };
+  }
+  if (cleanPath === '/folders') {
+    return { type: 'folders' };
+  }
+  const folderMatch = cleanPath.match(/^\/folders\/([^/]+)$/);
+  if (folderMatch) {
+    return { type: 'folder_detail', folderId: decodeURIComponent(folderMatch[1]) };
+  }
+  if (cleanPath === '/projects') {
+    return { type: 'projects' };
+  }
+  const projectMatch = cleanPath.match(/^\/projects\/([^/]+)$/);
+  if (projectMatch) {
+    return { type: 'project_detail', projectId: decodeURIComponent(projectMatch[1]) };
+  }
+
+  return { type: 'library' };
+}
+
+function getRoutePath(route: RouteState): string {
+  switch (route.type) {
+    case 'library':
+      return '/library';
+    case 'folders':
+      return '/folders';
+    case 'folder_detail':
+      return `/folders/${encodeURIComponent(route.folderId)}`;
+    case 'projects':
+      return '/projects';
+    case 'project_detail':
+      return `/projects/${encodeURIComponent(route.projectId)}`;
+    default:
+      return '/library';
+  }
+}
 
 export const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -35,9 +78,7 @@ export const AppContent: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
-  const [currentView, setCurrentView] = useState<ViewMode>('library');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname));
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
 
@@ -67,6 +108,33 @@ export const AppContent: React.FC = () => {
     item?: Track;
   } | null>(null);
 
+  // Sync with browser history popstate (Back/Forward buttons)
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(parseRoute(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Canonicalize root URL '/' to '/library' without reloading
+  useEffect(() => {
+    if (window.location.pathname === '/') {
+      window.history.replaceState({}, '', '/library');
+    }
+  }, []);
+
+  const navigate = (to: string | RouteState) => {
+    const targetState = typeof to === 'string' ? parseRoute(to) : to;
+    const targetPath = typeof to === 'string' ? to : getRoutePath(to);
+
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+    setRoute(targetState);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Load User Data from Firestore on Auth Change
   useEffect(() => {
     if (user) {
@@ -85,8 +153,6 @@ export const AppContent: React.FC = () => {
     } else {
       setFolders([]);
       setProjects([]);
-      setSelectedProject(null);
-      setSelectedFolder(null);
     }
   }, [user]);
 
@@ -96,25 +162,35 @@ export const AppContent: React.FC = () => {
     return { ...folder, itemCount: count };
   });
 
+  const selectedProject =
+    route.type === 'project_detail'
+      ? projects.find((p) => p.id === route.projectId) || null
+      : null;
+
+  const selectedFolder =
+    route.type === 'folder_detail'
+      ? computedFolders.find((f) => f.id === route.folderId) || null
+      : null;
+
+  const currentView: ViewMode = route.type;
+
   const openAuth = (mode: 'signin' | 'signup' = 'signin') => {
     setAuthModalMode(mode);
     setAuthModalOpen(true);
   };
 
   const handleProjectSelect = (project: Project) => {
-    setSelectedProject(project);
-    setCurrentView('project_detail');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate({ type: 'project_detail', projectId: project.id });
   };
 
-  const handleFolderSelect = (folder: Folder | null) => {
-    setSelectedFolder(folder);
-    setCurrentView('library');
+  const handleFolderSelect = (folder: Folder) => {
+    navigate({ type: 'folder_detail', folderId: folder.id });
   };
 
-  const handleBackToLibrary = () => {
-    setSelectedProject(null);
-    setCurrentView('library');
+  const handleSidebarNavigate = (view: ViewMode) => {
+    if (view === 'library') navigate('/library');
+    else if (view === 'folders') navigate('/folders');
+    else if (view === 'projects') navigate('/projects');
   };
 
   // --- Folder Handlers ---
@@ -147,9 +223,6 @@ export const AppContent: React.FC = () => {
       };
       await fsSaveFolder(user.uid, updated);
       setFolders((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
-      if (selectedFolder?.id === updated.id) {
-        setSelectedFolder(updated);
-      }
     } else {
       const newFolder: Folder = {
         id: `folder-${Date.now()}`,
@@ -198,9 +271,6 @@ export const AppContent: React.FC = () => {
       } as Project;
       await fsSaveProject(user.uid, updated);
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      if (selectedProject?.id === updated.id) {
-        setSelectedProject(updated);
-      }
     } else {
       const newProject: Project = {
         id: `proj-${Date.now()}`,
@@ -232,9 +302,6 @@ export const AppContent: React.FC = () => {
     setProjects((prev) =>
       prev.map((p) => (p.id === projectId ? { ...p, folderId: targetFolderId || undefined } : p))
     );
-    if (selectedProject?.id === projectId) {
-      setSelectedProject((prev) => (prev ? { ...prev, folderId: targetFolderId || undefined } : null));
-    }
   };
 
   const handlePromptDeleteProject = (project: Project) => {
@@ -266,7 +333,6 @@ export const AppContent: React.FC = () => {
 
     await fsSaveProject(user.uid, updatedProject);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
-    setSelectedProject(updatedProject);
   };
 
   const handleOpenEditTrack = (track: Track) => {
@@ -289,7 +355,6 @@ export const AppContent: React.FC = () => {
 
     await fsSaveProject(user.uid, updatedProject);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
-    setSelectedProject(updatedProject);
   };
 
   const handlePromptDeleteTrack = (track: Track) => {
@@ -308,7 +373,6 @@ export const AppContent: React.FC = () => {
 
     await fsReorderTracks(user.uid, reorderedTracks);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
-    setSelectedProject(updatedProject);
   };
 
   // --- Deletion Handler ---
@@ -321,15 +385,14 @@ export const AppContent: React.FC = () => {
       setProjects((prev) =>
         prev.map((p) => (p.folderId === deleteTarget.id ? { ...p, folderId: undefined } : p))
       );
-      if (selectedFolder?.id === deleteTarget.id) {
-        setSelectedFolder(null);
+      if (route.type === 'folder_detail' && route.folderId === deleteTarget.id) {
+        navigate('/folders');
       }
     } else if (deleteTarget.type === 'project') {
       await fsDeleteProject(user.uid, deleteTarget.id);
       setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      if (selectedProject?.id === deleteTarget.id) {
-        setSelectedProject(null);
-        setCurrentView('library');
+      if (route.type === 'project_detail' && route.projectId === deleteTarget.id) {
+        navigate('/projects');
       }
     } else if (deleteTarget.type === 'track' && selectedProject) {
       await fsDeleteTrack(user.uid, deleteTarget.id, deleteTarget.item?.audioUrl);
@@ -343,7 +406,6 @@ export const AppContent: React.FC = () => {
 
       await fsSaveProject(user.uid, updatedProject);
       setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
-      setSelectedProject(updatedProject);
     }
 
     setDeleteTarget(null);
@@ -368,18 +430,7 @@ export const AppContent: React.FC = () => {
       <div className="hidden md:block shrink-0">
         <Sidebar
           currentView={currentView}
-          onNavigate={(view) => {
-            setCurrentView(view);
-            if (view === 'library') {
-              setSelectedProject(null);
-              setSelectedFolder(null);
-            }
-          }}
-          activeFilter={activeFilter}
-          onFilterSelect={(filter) => {
-            setActiveFilter(filter);
-            if (filter === 'Folders') setSelectedFolder(null);
-          }}
+          onNavigate={handleSidebarNavigate}
           onCreateProject={() => handleOpenCreateProject()}
           projects={projects}
           onProjectSelect={handleProjectSelect}
@@ -393,8 +444,20 @@ export const AppContent: React.FC = () => {
           currentView={currentView}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onBack={selectedProject ? handleBackToLibrary : undefined}
-          title={selectedProject ? selectedProject.title : undefined}
+          onBack={
+            route.type === 'project_detail'
+              ? () => navigate('/projects')
+              : route.type === 'folder_detail'
+              ? () => navigate('/folders')
+              : undefined
+          }
+          title={
+            route.type === 'project_detail'
+              ? selectedProject?.title || 'Project'
+              : route.type === 'folder_detail'
+              ? selectedFolder?.name || 'Folder'
+              : undefined
+          }
           onOpenAuth={() => openAuth('signin')}
         />
 
@@ -457,25 +520,89 @@ export const AppContent: React.FC = () => {
                 Loading Your Cloud Studio...
               </span>
             </div>
-          ) : currentView === 'project_detail' && selectedProject ? (
-            <ProjectDetailView
-              project={selectedProject}
+          ) : route.type === 'folder_detail' ? (
+            selectedFolder ? (
+              <FolderDetailView
+                folder={selectedFolder}
+                projects={projects}
+                searchQuery={searchQuery}
+                onBack={() => navigate('/folders')}
+                onProjectSelect={handleProjectSelect}
+                onEditFolder={handleOpenEditFolder}
+                onDeleteFolder={handlePromptDeleteFolder}
+                onCreateProject={handleOpenCreateProject}
+                onEditProject={handleOpenEditProject}
+                onMoveProject={handleOpenMoveProject}
+                onDeleteProject={handlePromptDeleteProject}
+              />
+            ) : (
+              <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
+                <p className="text-lg font-bold text-[#E5E2E1]">Folder Not Found</p>
+                <p className="text-xs text-[#E8BDB3]/60">The requested folder does not exist or has been deleted.</p>
+                <button
+                  onClick={() => navigate('/folders')}
+                  className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Folders</span>
+                </button>
+              </div>
+            )
+          ) : route.type === 'project_detail' ? (
+            selectedProject ? (
+              <ProjectDetailView
+                project={selectedProject}
+                onEditProject={handleOpenEditProject}
+                onMoveProject={handleOpenMoveProject}
+                onDeleteProject={handlePromptDeleteProject}
+                onUploadTracks={handleOpenUploadTracks}
+                onEditTrack={handleOpenEditTrack}
+                onDeleteTrack={handlePromptDeleteTrack}
+                onReorderTracks={handleReorderTracks}
+              />
+            ) : (
+              <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
+                <p className="text-lg font-bold text-[#E5E2E1]">Project Not Found</p>
+                <p className="text-xs text-[#E8BDB3]/60">The requested project does not exist or has been deleted.</p>
+                <button
+                  onClick={() => navigate('/projects')}
+                  className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Projects</span>
+                </button>
+              </div>
+            )
+          ) : route.type === 'folders' ? (
+            <FoldersView
+              folders={computedFolders}
+              searchQuery={searchQuery}
+              onFolderSelect={handleFolderSelect}
+              onCreateFolder={handleOpenCreateFolder}
+              onEditFolder={handleOpenEditFolder}
+              onDeleteFolder={handlePromptDeleteFolder}
+            />
+          ) : route.type === 'projects' ? (
+            <ProjectsView
+              projects={projects}
+              searchQuery={searchQuery}
+              activeCategory={activeFilter}
+              onCategoryChange={setActiveFilter}
+              onProjectSelect={handleProjectSelect}
+              onCreateProject={handleOpenCreateProject}
               onEditProject={handleOpenEditProject}
               onMoveProject={handleOpenMoveProject}
               onDeleteProject={handlePromptDeleteProject}
-              onUploadTracks={handleOpenUploadTracks}
-              onEditTrack={handleOpenEditTrack}
-              onDeleteTrack={handlePromptDeleteTrack}
-              onReorderTracks={handleReorderTracks}
             />
           ) : (
             <LibraryView
               folders={computedFolders}
               projects={projects}
               searchQuery={searchQuery}
-              selectedFolder={selectedFolder}
               onProjectSelect={handleProjectSelect}
               onFolderSelect={handleFolderSelect}
+              onViewAllFolders={() => navigate('/folders')}
+              onViewAllProjects={() => navigate('/projects')}
               activeFilterTab={activeFilter}
               onFilterChange={setActiveFilter}
               onCreateFolder={handleOpenCreateFolder}
@@ -492,13 +619,8 @@ export const AppContent: React.FC = () => {
         {/* Mobile Navigation */}
         <MobileNav
           currentView={currentView}
-          onNavigate={(view) => {
-            setCurrentView(view);
-            if (view === 'library') {
-              setSelectedProject(null);
-              setSelectedFolder(null);
-            }
-          }}
+          onNavigate={handleSidebarNavigate}
+          onOpenAuth={() => openAuth('signin')}
         />
 
         {/* Fixed Bottom Audio Player */}

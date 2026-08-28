@@ -7,8 +7,6 @@ import { useAuth } from '../../context/AuthContext';
 interface SidebarProps {
   currentView: ViewMode;
   onNavigate: (view: ViewMode) => void;
-  activeFilter?: string;
-  onFilterSelect?: (filter: string) => void;
   onCreateProject?: () => void;
   projects?: Project[];
   onProjectSelect?: (project: Project) => void;
@@ -18,8 +16,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onNavigate,
-  activeFilter = 'All',
-  onFilterSelect,
   onCreateProject,
   projects = [],
   onProjectSelect,
@@ -28,9 +24,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, logout } = useAuth();
 
   const mainNavItems = [
-    { id: 'library', label: 'Library', icon: Library },
-    { id: 'folders', label: 'Folders', icon: Folder },
-    { id: 'albums', label: 'Projects', icon: Disc },
+    { id: 'library' as const, label: 'Library', icon: Library },
+    { id: 'folders' as const, label: 'Folders', icon: Folder },
+    { id: 'projects' as const, label: 'Projects', icon: Disc },
   ];
 
   const recentProjects = projects.slice(0, 5);
@@ -39,6 +35,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (name && name.trim()) return name.trim().charAt(0).toUpperCase();
     if (email && email.trim()) return email.trim().charAt(0).toUpperCase();
     return 'U';
+  };
+
+  const isItemActive = (itemId: 'library' | 'folders' | 'projects') => {
+    if (itemId === 'library') {
+      return currentView === 'library';
+    }
+    if (itemId === 'folders') {
+      return currentView === 'folders' || currentView === 'folder_detail';
+    }
+    if (itemId === 'projects') {
+      return currentView === 'projects' || currentView === 'project_detail';
+    }
+    return false;
   };
 
   return (
@@ -61,10 +70,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4">
           <button
             onClick={() => {
+              if (!user) {
+                onOpenAuth();
+                return;
+              }
               if (onCreateProject) {
                 onCreateProject();
-              } else {
-                onNavigate('library');
               }
             }}
             className="w-full bg-[#E5E2E1] hover:bg-white text-black font-semibold py-2.5 px-4 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wide transition-all cursor-pointer shadow-sm"
@@ -83,13 +94,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <nav className="space-y-1">
               {mainNavItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentView === item.id || (currentView === 'library' && activeFilter === item.label);
+                const isActive = isItemActive(item.id);
                 return (
                   <button
                     key={item.id}
                     onClick={() => {
-                      onNavigate('library');
-                      if (onFilterSelect) onFilterSelect(item.label);
+                      if (!user) {
+                        onOpenAuth();
+                        return;
+                      }
+                      onNavigate(item.id);
                     }}
                     className={clsx(
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-[4px] transition-colors text-left cursor-pointer text-xs font-medium',
@@ -115,10 +129,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={proj.id}
                   onClick={() => {
+                    if (!user) {
+                      onOpenAuth();
+                      return;
+                    }
                     if (onProjectSelect) {
                       onProjectSelect(proj);
-                    } else {
-                      onNavigate('library');
                     }
                   }}
                   className="w-full text-left px-3 py-1.5 text-[#E8BDB3]/70 hover:text-white truncate transition-colors cursor-pointer flex items-center justify-between"
