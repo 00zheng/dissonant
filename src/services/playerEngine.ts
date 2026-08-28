@@ -4,12 +4,14 @@ export type DurationCallback = (duration: number) => void;
 export type EndedCallback = () => void;
 export type ErrorCallback = (error: any) => void;
 export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
+export type PlaybackRateCallback = (rate: number) => void;
 
 export class AudioPlayerEngine {
   private audio: HTMLAudioElement;
   private isPlayingState: boolean = false;
   private volumeState: number = 0.8;
   private isMutedState: boolean = false;
+  private playbackRateState: number = 1.0;
 
   // A-B Looping State
   private loopAState: number | null = null;
@@ -22,11 +24,25 @@ export class AudioPlayerEngine {
   private endedListeners: Set<EndedCallback> = new Set();
   private errorListeners: Set<ErrorCallback> = new Set();
   private loopListeners: Set<LoopStateCallback> = new Set();
+  private rateListeners: Set<PlaybackRateCallback> = new Set();
 
   constructor() {
     this.audio = new Audio();
     this.audio.volume = this.volumeState;
+    this.setAudioPreservesPitch();
     this.setupEventListeners();
+  }
+
+  private setAudioPreservesPitch() {
+    if ('preservesPitch' in this.audio) {
+      (this.audio as any).preservesPitch = true;
+    }
+    if ('mozPreservesPitch' in this.audio) {
+      (this.audio as any).mozPreservesPitch = true;
+    }
+    if ('webkitPreservesPitch' in this.audio) {
+      (this.audio as any).webkitPreservesPitch = true;
+    }
   }
 
   private setupEventListeners() {
@@ -102,6 +118,10 @@ export class AudioPlayerEngine {
       this.audio.src = src;
       this.audio.currentTime = startTime;
     }
+
+    this.audio.playbackRate = this.playbackRateState;
+    this.setAudioPreservesPitch();
+
     try {
       await this.audio.play();
       this.isPlayingState = true;
@@ -115,6 +135,9 @@ export class AudioPlayerEngine {
 
   public async play(): Promise<void> {
     if (!this.audio.src) return;
+    this.audio.playbackRate = this.playbackRateState;
+    this.setAudioPreservesPitch();
+
     try {
       await this.audio.play();
       this.isPlayingState = true;
@@ -176,6 +199,18 @@ export class AudioPlayerEngine {
     this.setMuted(!this.isMutedState);
   }
 
+  public setPlaybackRate(rate: number): void {
+    const clamped = Math.max(0.5, Math.min(2.0, rate));
+    this.playbackRateState = clamped;
+    this.audio.playbackRate = clamped;
+    this.setAudioPreservesPitch();
+    this.rateListeners.forEach((cb) => cb(clamped));
+  }
+
+  public getPlaybackRate(): number {
+    return this.playbackRateState;
+  }
+
   public getCurrentTime(): number {
     return this.audio.currentTime || 0;
   }
@@ -215,7 +250,6 @@ export class AudioPlayerEngine {
   public setLoopB(time?: number): void {
     const dur = this.getDuration();
     let val = time !== undefined ? time : this.getCurrentTime();
-    // Clamp B to duration
     if (dur && val > dur) {
       val = dur;
     }
@@ -233,7 +267,6 @@ export class AudioPlayerEngine {
   public toggleLoopActive(): void {
     this.isLoopActiveState = !this.isLoopActiveState;
 
-    // If turning ON and A/B not set, default A to 0 and B to duration/current
     if (this.isLoopActiveState) {
       const dur = this.getDuration();
       if (this.loopAState === null) {
@@ -242,7 +275,6 @@ export class AudioPlayerEngine {
       if (this.loopBState === null) {
         this.loopBState = dur || 10;
       }
-      // If currentTime is outside [loopA, loopB], jump to loopA
       const curr = this.getCurrentTime();
       if (curr < this.loopAState || curr > this.loopBState) {
         this.seek(this.loopAState);
@@ -297,6 +329,11 @@ export class AudioPlayerEngine {
   public onLoopChange(cb: LoopStateCallback): () => void {
     this.loopListeners.add(cb);
     return () => this.loopListeners.delete(cb);
+  }
+
+  public onPlaybackRateChange(cb: PlaybackRateCallback): () => void {
+    this.rateListeners.add(cb);
+    return () => this.rateListeners.delete(cb);
   }
 }
 

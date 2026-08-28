@@ -13,6 +13,7 @@ interface PlayerContextType {
   loopA: number | null;
   loopB: number | null;
   isLoopActive: boolean;
+  playbackRate: number;
   playTrack: (track: Track, project?: Project) => void;
   togglePlay: () => void;
   seek: (seconds: number) => void;
@@ -24,6 +25,7 @@ interface PlayerContextType {
   setLoopB: (time?: number) => void;
   toggleLoopActive: () => void;
   clearLoop: () => void;
+  setPlaybackRate: (rate: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -36,6 +38,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMutedState] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1.0);
 
   // A-B Loop States
   const [loopA, setLoopAState] = useState<number | null>(null);
@@ -74,6 +77,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsLoopActiveState(active);
     });
 
+    const unsubRate = playerEngine.onPlaybackRateChange((rate) => {
+      setPlaybackRateState(rate);
+    });
+
     const unsubEnded = playerEngine.onEnded(() => {
       // Auto-advance to next track in project track order
       const proj = currentProjectRef.current;
@@ -98,6 +105,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubTime();
       unsubDuration();
       unsubLoop();
+      unsubRate();
       unsubEnded();
     };
   }, []);
@@ -193,6 +201,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playerEngine.clearLoop();
   }, []);
 
+  // Playback Rate Callback
+  const setPlaybackRate = useCallback((rate: number) => {
+    playerEngine.setPlaybackRate(rate);
+  }, []);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -206,6 +219,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loopA,
         loopB,
         isLoopActive,
+        playbackRate,
         playTrack,
         togglePlay,
         seek,
@@ -217,6 +231,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setLoopB,
         toggleLoopActive,
         clearLoop,
+        setPlaybackRate,
       }}
     >
       {children}

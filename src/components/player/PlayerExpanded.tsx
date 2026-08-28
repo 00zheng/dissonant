@@ -1,7 +1,9 @@
 import React from 'react';
 import { usePlayer } from '../../context/PlayerContext';
-import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Shuffle } from 'lucide-react';
+import { X, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Shuffle, Gauge } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
+
+const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 interface PlayerExpandedProps {
   onClose: () => void;
@@ -29,6 +31,8 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
     setLoopB,
     toggleLoopActive,
     clearLoop,
+    playbackRate,
+    setPlaybackRate,
   } = usePlayer();
 
   if (!currentTrack) return null;
@@ -102,6 +106,35 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
             <div className="flex justify-between font-mono-label text-xs text-[#E8BDB3]/60">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Playback Speed Control Panel */}
+          <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
+                <Gauge className="w-4 h-4 text-[#FF3B00]" />
+                <span>Playback Speed (Pitch Preserved)</span>
+              </div>
+              <span className="text-xs font-mono font-bold text-[#FF3B00]">
+                {playbackRate}x
+              </span>
+            </div>
+
+            <div className="grid grid-cols-6 gap-1.5 text-xs font-mono">
+              {SPEED_PRESETS.map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => setPlaybackRate(rate)}
+                  className={`py-1.5 rounded-[4px] border transition-colors cursor-pointer text-center ${
+                    playbackRate === rate
+                      ? 'bg-[#FF3B00] border-[#FF3B00] text-white font-bold'
+                      : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
+                  }`}
+                >
+                  {rate}x
+                </button>
+              ))}
             </div>
           </div>
 
@@ -208,7 +241,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
       {/* Footer Meta */}
       <div className="flex items-center justify-between font-mono-label text-xs text-[#E8BDB3]/40 border-t border-[#282828] pt-4">
         <span>PROJECT: {currentProject?.title ?? 'STANDALONE TRACK'}</span>
-        <span>AUDIO ENGINE: A-B LOOP ACTIVE ({isLoopActive ? 'YES' : 'NO'})</span>
+        <span>RATE: {playbackRate}x (PITCH PRESERVED)</span>
       </div>
     </div>
   );

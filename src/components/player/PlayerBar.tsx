@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { usePlayer } from '../../context/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Repeat } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Repeat, Gauge } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
 import { PlayerExpanded } from './PlayerExpanded';
+
+const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
 export const PlayerBar: React.FC = () => {
   const {
@@ -26,9 +28,12 @@ export const PlayerBar: React.FC = () => {
     setLoopB,
     toggleLoopActive,
     clearLoop,
+    playbackRate,
+    setPlaybackRate,
   } = usePlayer();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   if (!currentTrack) return null;
 
@@ -126,8 +131,54 @@ export const PlayerBar: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: A-B Loop Controls, Volume & Expand */}
-          <div className="flex items-center justify-end gap-3 w-1/3 max-w-[340px]">
+          {/* Right: Speed, A-B Loop Controls, Volume & Expand */}
+          <div className="flex items-center justify-end gap-3 w-1/3 max-w-[420px]">
+            {/* Playback Speed Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                className={`px-2 py-1 rounded-[4px] border border-[#282828] text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
+                  playbackRate !== 1.0
+                    ? 'bg-[#FF3B00]/20 text-[#FF3B00] border-[#FF3B00]'
+                    : 'bg-[#131313] text-[#E8BDB3]/80 hover:text-white'
+                }`}
+                title="Playback Speed"
+              >
+                <Gauge className="w-3 h-3" />
+                <span>{playbackRate}x</span>
+              </button>
+
+              {showSpeedMenu && (
+                <div
+                  className="absolute bottom-9 right-0 z-40 bg-[#1C1B1B] border border-[#282828] rounded-[6px] shadow-xl p-1 text-xs font-mono space-y-0.5 min-w-[80px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-2 py-1 text-[10px] text-[#E8BDB3]/50 border-b border-[#282828] font-sans font-semibold uppercase">
+                    Speed
+                  </div>
+                  {SPEED_PRESETS.map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => {
+                        setPlaybackRate(rate);
+                        setShowSpeedMenu(false);
+                      }}
+                      className={`w-full text-left px-2 py-1 rounded-[3px] transition-colors cursor-pointer flex items-center justify-between ${
+                        playbackRate === rate
+                          ? 'bg-[#FF3B00] text-white font-bold'
+                          : 'text-[#E5E2E1] hover:bg-[#2A2A2A]'
+                      }`}
+                    >
+                      <span>{rate}x</span>
+                      {rate === 1.0 && (
+                        <span className="text-[9px] opacity-60 font-sans">Normal</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* A-B Looping Control Group */}
             <div className="hidden lg:flex items-center gap-1 bg-[#131313] border border-[#282828] rounded-[4px] p-0.5 text-[10px] font-mono">
               <button
