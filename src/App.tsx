@@ -464,49 +464,49 @@ export const AppContent: React.FC = () => {
         <main className="flex-1 overflow-y-auto bg-[#000000]">
           {!user ? (
             /* Logged Out Welcome View */
-            <div className="min-h-full flex flex-col items-center justify-center p-8 text-center max-w-xl mx-auto">
-              <div className="w-16 h-16 bg-[#131313] border border-[#282828] rounded-[8px] flex items-center justify-center mb-6 shadow-xl">
-                <Music2 className="w-8 h-8 text-[#FF3B00]" />
+            <div className="min-h-full flex flex-col items-center justify-center p-5 sm:p-8 text-center max-w-xl mx-auto pb-44">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#131313] border border-[#282828] rounded-[8px] flex items-center justify-center mb-4 sm:mb-6 shadow-xl">
+                <Music2 className="w-7 h-7 sm:w-8 sm:h-8 text-[#FF3B00]" />
               </div>
               <span className="text-xs font-bold tracking-[0.2em] text-[#FF3B00] uppercase mb-2">
                 Dissonant Cloud
               </span>
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#E5E2E1] mb-3">
+              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#E5E2E1] mb-2.5 sm:mb-3">
                 Your Personal Music Workspace
               </h1>
-              <p className="text-sm text-[#E8BDB3]/70 mb-8 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#E8BDB3]/70 mb-6 sm:mb-8 leading-relaxed max-w-md">
                 Sign in to synchronize your folders, music projects, and audio files across devices with isolated cloud storage.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs mb-10">
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full max-w-xs mb-8 sm:mb-10">
                 <button
                   onClick={() => openAuth('signin')}
-                  className="flex-1 bg-[#E5E2E1] hover:bg-white text-black font-bold py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer"
+                  className="flex-1 bg-[#E5E2E1] hover:bg-white text-black font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>Sign In</span>
                 </button>
                 <button
                   onClick={() => openAuth('signup')}
-                  className="flex-1 bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white font-bold py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer"
+                  className="flex-1 bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
                 >
                   <span>Create Account</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full pt-8 border-t border-[#282828] text-left">
-                <div className="bg-[#0E0E0E] p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <ShieldCheck className="w-5 h-5 text-[#FF3B00] mb-2" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full pt-6 sm:pt-8 border-t border-[#282828] text-left">
+                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
                   <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">User Isolation</h4>
                   <p className="text-[11px] text-[#E8BDB3]/50">Every project and song is secured under your unique UID.</p>
                 </div>
-                <div className="bg-[#0E0E0E] p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <Database className="w-5 h-5 text-[#FF3B00] mb-2" />
+                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                  <Database className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
                   <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Cloud Firestore</h4>
                   <p className="text-[11px] text-[#E8BDB3]/50">Instant metadata sync with real-time playlist ordering.</p>
                 </div>
-                <div className="bg-[#0E0E0E] p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <Lock className="w-5 h-5 text-[#FF3B00] mb-2" />
+                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                  <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
                   <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Local Audio Cache</h4>
                   <p className="text-[11px] text-[#E8BDB3]/50">High-performance audio processing with zero bandwidth lag.</p>
                 </div>

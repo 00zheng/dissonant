@@ -26,23 +26,23 @@ export const FolderList: React.FC<FolderListProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {folders.map((folder) => (
         <Card
           key={folder.id}
           variant="low"
           hoverEffect
           onClick={() => onFolderSelect(folder)}
-          className="p-5 flex flex-col justify-between group border-[#282828] hover:border-[#2A2A2A] transition-colors relative"
+          className="p-3.5 sm:p-5 flex flex-col justify-between group border-[#282828] hover:border-[#2A2A2A] transition-colors relative rounded-[8px]"
         >
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-[6px] bg-[#131313] border border-[#282828] flex items-center justify-center">
-                <Folder className="w-5 h-5 text-[#E5E2E1]" />
+            <div className="flex items-center justify-between mb-2.5 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[6px] bg-[#131313] border border-[#282828] flex items-center justify-center shrink-0">
+                <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-[#E5E2E1]" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#E8BDB3]/60 font-medium">
-                  {folder.itemCount} projects
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-[11px] sm:text-xs text-[#E8BDB3]/60 font-medium">
+                  {folder.itemCount} {folder.itemCount === 1 ? 'project' : 'projects'}
                 </span>
 
                 {(onEditFolder || onDeleteFolder) && (
@@ -91,23 +91,25 @@ export const FolderList: React.FC<FolderListProps> = ({
               </div>
             </div>
 
-            <h3 className="text-base font-semibold text-[#E5E2E1] group-hover:text-white truncate">
+            <h3 className="text-sm sm:text-base font-semibold text-[#E5E2E1] group-hover:text-white truncate">
               {folder.name}
             </h3>
-            <p className="text-xs text-[#E8BDB3]/60 line-clamp-2 mt-1">
-              {folder.description || 'No description'}
-            </p>
+            {folder.description && (
+              <p className="text-xs text-[#E8BDB3]/60 line-clamp-1 sm:line-clamp-2 mt-0.5 sm:mt-1">
+                {folder.description}
+              </p>
+            )}
           </div>
 
-          <div className="mt-4 pt-3 flex items-center justify-between text-xs text-[#E8BDB3]/50">
+          <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 flex items-center justify-between text-[11px] sm:text-xs text-[#E8BDB3]/50 border-t border-[#282828]/50">
             <span>{folder.updatedAt}</span>
-            <ChevronRight className="w-4 h-4 text-[#E8BDB3]/40 group-hover:text-white transition-colors" />
+            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8BDB3]/40 group-hover:text-white transition-colors" />
           </div>
         </Card>
       ))}
 
       {folders.length === 0 && (
-        <div className="col-span-full py-16 text-center border border-dashed border-[#282828] rounded-[8px] bg-[#0E0E0E]">
+        <div className="col-span-full py-12 sm:py-16 text-center border border-dashed border-[#282828] rounded-[8px] bg-[#0E0E0E]">
           <p className="text-base text-[#E5E2E1] font-semibold">No Folders Found</p>
           <p className="text-xs text-[#E8BDB3]/50 mt-1">
             Create a folder to start organizing your music projects.

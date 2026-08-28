@@ -31,13 +31,13 @@ export const FoldersView: React.FC<FoldersViewProps> = ({
   });
 
   return (
-    <div className="py-10 px-8 lg:px-12 space-y-8 max-w-7xl mx-auto pb-36">
+    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-44">
       {/* Header bar */}
-      <div className="border-b border-[#282828] pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="border-b border-[#282828] pb-5 sm:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <FolderIcon className="w-7 h-7 text-[#FF3B00]" />
-            <h1 className="text-3xl lg:text-4xl font-bold text-[#E5E2E1] tracking-tight">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <FolderIcon className="w-6 h-6 sm:w-7 sm:h-7 text-[#FF3B00]" />
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#E5E2E1] tracking-tight">
               Folders
             </h1>
           </div>
@@ -51,7 +51,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({
             variant="accent"
             size="sm"
             onClick={onCreateFolder}
-            className="gap-2"
+            className="gap-2 min-h-[38px] flex-1 sm:flex-initial justify-center"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>New Folder</span>
@@ -60,16 +60,16 @@ export const FoldersView: React.FC<FoldersViewProps> = ({
       </div>
 
       {/* Folders Grid */}
-      <section className="space-y-4">
+      <section className="space-y-3.5 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#E5E2E1]">All Folders</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-[#E5E2E1]">All Folders</h2>
           <span className="text-xs text-[#E8BDB3]/50">
             {filteredFolders.length} {filteredFolders.length === 1 ? 'folder' : 'folders'}
           </span>
         </div>
 
         {filteredFolders.length === 0 && searchQuery ? (
-          <div className="py-16 text-center border border-dashed border-[#282828] rounded-[8px] bg-[#0E0E0E]">
+          <div className="py-12 sm:py-16 text-center border border-dashed border-[#282828] rounded-[8px] bg-[#0E0E0E]">
             <p className="text-base text-[#E5E2E1] font-semibold">No Matching Folders</p>
             <p className="text-xs text-[#E8BDB3]/50 mt-1">
               No folders match the search query "{searchQuery}".

@@ -47,10 +47,10 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   };
 
   return (
-    <div className="bg-[#131313] border-b border-[#282828] p-6 lg:p-10">
-      <div className="flex flex-col sm:flex-row gap-8 items-start sm:items-end max-w-7xl mx-auto">
+    <div className="bg-[#131313] border-b border-[#282828] p-5 sm:p-6 lg:p-10">
+      <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-center sm:items-end max-w-7xl mx-auto text-center sm:text-left">
         {/* Cover Art */}
-        <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-[8px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 relative">
+        <div className="w-36 h-36 sm:w-48 sm:h-48 lg:w-52 lg:h-52 rounded-[8px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 relative shadow-xl">
           <img
             src={project.coverUrl}
             alt={project.title}
@@ -59,19 +59,32 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         </div>
 
         {/* Info Block */}
-        <div className="flex-1 space-y-3">
+        <div className="flex-1 space-y-2 sm:space-y-3 min-w-0 w-full">
           <div className="space-y-1">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#E5E2E1] tracking-tight">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-[#E5E2E1] tracking-tight truncate">
               {project.title}
             </h1>
-            <p className="text-base sm:text-lg text-[#E8BDB3]/80 font-medium">
+            <p className="text-sm sm:text-base lg:text-lg text-[#E8BDB3]/80 font-medium truncate">
               {project.artist}
             </p>
           </div>
 
-          {/* Tags */}
+          {/* Metadata */}
+          <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 text-xs text-[#E8BDB3]/60 font-mono">
+            <span>{project.tracksCount} {project.tracksCount === 1 ? 'track' : 'tracks'}</span>
+            <span>•</span>
+            <span>{project.totalDuration}</span>
+            {project.releaseDate && (
+              <>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">{project.releaseDate}</span>
+              </>
+            )}
+          </div>
+
+          {/* Tags (Desktop) */}
           {project.tags && project.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="hidden sm:flex flex-wrap gap-2 pt-1">
               {project.tags.map((tag) => (
                 <span
                   key={tag}
@@ -83,27 +96,14 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </div>
           )}
 
-          {/* Metadata */}
-          <div className="flex items-center gap-4 text-xs text-[#E8BDB3]/60 pt-1">
-            <span>{project.tracksCount} tracks</span>
-            <span>•</span>
-            <span>{project.totalDuration}</span>
-            {project.releaseDate && (
-              <>
-                <span>•</span>
-                <span>{project.releaseDate}</span>
-              </>
-            )}
-          </div>
-
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center gap-3 pt-3 relative">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 pt-2 sm:pt-3 relative">
             <Button
               variant="accent"
               size="md"
               onClick={handleMainPlay}
               disabled={!hasPlayableAudio && !isPlayingThisProject}
-              className={`gap-2 ${!hasPlayableAudio && !isPlayingThisProject ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`gap-2 min-h-[40px] px-4 ${!hasPlayableAudio && !isPlayingThisProject ? 'opacity-50 cursor-not-allowed' : ''}`}
               title={hasPlayableAudio ? 'Play Project' : 'No audio files uploaded in this project'}
             >
               {isPlayingThisProject ? (
@@ -124,7 +124,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               size="md"
               onClick={handleShuffle}
               disabled={!hasPlayableAudio}
-              className={`gap-2 ${!hasPlayableAudio ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`gap-2 min-h-[40px] px-4 ${!hasPlayableAudio ? 'opacity-50 cursor-not-allowed' : ''}`}
               title={hasPlayableAudio ? 'Shuffle Play' : 'No audio files uploaded'}
             >
               <Shuffle className="w-4 h-4" />
@@ -132,17 +132,17 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </Button>
 
             {onUploadTracks && (
-              <Button variant="secondary" size="md" onClick={onUploadTracks} className="gap-2">
+              <Button variant="secondary" size="md" onClick={onUploadTracks} className="gap-2 min-h-[40px] px-4">
                 <Plus className="w-4 h-4" />
                 <span>Add Songs</span>
               </Button>
             )}
 
             {(onEditProject || onMoveProject || onDeleteProject) && (
-              <div className="relative ml-auto">
+              <div className="relative sm:ml-auto">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 text-[#E8BDB3]/60 hover:text-white rounded-[4px] border border-[#282828] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
+                  className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-[#E8BDB3]/60 hover:text-white rounded-[4px] border border-[#282828] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
                   title="Project Options"
                 >
                   <MoreHorizontal className="w-5 h-5" />
@@ -150,7 +150,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
                 {showMenu && (
                   <div
-                    className="absolute right-0 top-11 z-30 w-44 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs"
+                    className="absolute right-0 top-11 z-30 w-44 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {onEditProject && (

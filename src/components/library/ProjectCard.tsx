@@ -132,19 +132,19 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       </div>
 
       {/* Info Block */}
-      <div className="p-4 flex flex-col justify-between flex-1">
-        <div>
-          <h3 className="font-semibold text-base text-[#E5E2E1] group-hover:text-white truncate">
+      <div className="p-3 sm:p-4 flex flex-col justify-between flex-1 gap-2">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-xs sm:text-base text-[#E5E2E1] group-hover:text-white truncate">
             {project.title}
           </h3>
-          <p className="text-xs text-[#E8BDB3]/60 truncate mt-0.5">
+          <p className="text-[11px] sm:text-xs text-[#E8BDB3]/60 truncate mt-0.5">
             {project.artist}
           </p>
         </div>
 
-        <div className="mt-3 pt-2 flex items-center justify-between text-xs text-[#E8BDB3]/50 border-t border-[#282828]">
-          <span>{project.tracksCount} tracks</span>
-          <span>{project.totalDuration}</span>
+        <div className="pt-1.5 sm:pt-2 flex items-center justify-between text-[10px] sm:text-xs text-[#E8BDB3]/50 border-t border-[#282828] font-mono">
+          <span>{project.tracksCount} {project.tracksCount === 1 ? 'track' : 'tracks'}</span>
+          <span className="hidden sm:inline">{project.totalDuration}</span>
         </div>
       </div>
     </Card>

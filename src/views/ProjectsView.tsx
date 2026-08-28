@@ -36,13 +36,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   });
 
   return (
-    <div className="py-10 px-8 lg:px-12 space-y-8 max-w-7xl mx-auto pb-36">
+    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-44">
       {/* Header bar */}
-      <div className="border-b border-[#282828] pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="border-b border-[#282828] pb-5 sm:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <Disc className="w-7 h-7 text-[#FF3B00]" />
-            <h1 className="text-3xl lg:text-4xl font-bold text-[#E5E2E1] tracking-tight">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <Disc className="w-6 h-6 sm:w-7 sm:h-7 text-[#FF3B00]" />
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#E5E2E1] tracking-tight">
               Projects
             </h1>
           </div>
@@ -56,7 +56,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             variant="accent"
             size="sm"
             onClick={onCreateProject}
-            className="gap-2"
+            className="gap-2 min-h-[38px] flex-1 sm:flex-initial justify-center"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>New Project</span>
@@ -65,9 +65,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       </div>
 
       {/* Projects Grid */}
-      <section className="space-y-4">
+      <section className="space-y-3.5 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#E5E2E1]">All Projects</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-[#E5E2E1]">All Projects</h2>
           <span className="text-xs text-[#E8BDB3]/50">
             {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
           </span>

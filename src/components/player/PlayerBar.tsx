@@ -49,7 +49,7 @@ export const PlayerBar: React.FC = () => {
 
   return (
     <>
-      <div className="fixed bottom-14 md:bottom-0 left-0 right-0 bg-[#0E0E0E] border-t border-[#282828] z-30 flex flex-col select-none">
+      <div className="fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-[#0E0E0E]/95 backdrop-blur-md border-t border-[#282828] z-30 flex flex-col select-none shadow-2xl">
         {/* Top 2px Progress Line in Accent #FF3B00 */}
         <div className="w-full relative">
           <ProgressBar
@@ -64,12 +64,12 @@ export const PlayerBar: React.FC = () => {
         </div>
 
         {/* Player Controls Bar */}
-        <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4">
+        <div className="h-14 sm:h-16 px-3 sm:px-4 md:px-6 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Track Info Thumbnail */}
-          <div className="flex items-center gap-3 w-1/3 min-w-[150px] max-w-[280px]">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-1 md:flex-initial md:w-1/3 md:min-w-[150px] md:max-w-[280px] min-w-0">
             <div
               onClick={() => setIsExpanded(true)}
-              className="w-10 h-10 rounded-[4px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 cursor-pointer group relative"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-[4px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 cursor-pointer group relative"
             >
               <img
                 src={currentTrack.coverUrl}
@@ -77,54 +77,54 @@ export const PlayerBar: React.FC = () => {
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Maximize2 className="w-4 h-4 text-white" />
+                <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
               </div>
             </div>
-            <div className="truncate">
+            <div className="truncate min-w-0 pr-1">
               <h4
                 onClick={() => setIsExpanded(true)}
-                className="text-sm font-semibold text-[#E5E2E1] hover:text-white truncate cursor-pointer"
+                className="text-xs sm:text-sm font-semibold text-[#E5E2E1] hover:text-white truncate cursor-pointer"
               >
                 {currentTrack.title}
               </h4>
-              <p className="text-xs text-[#E8BDB3]/60 truncate">
+              <p className="text-[11px] sm:text-xs text-[#E8BDB3]/60 truncate">
                 {currentTrack.artist}{currentProject ? ` • ${currentProject.title}` : ''}
               </p>
             </div>
           </div>
 
           {/* Center: Playback Buttons & Timer */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center md:flex-col items-center gap-2 sm:gap-3 md:gap-1 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
               <button
                 onClick={playPrevious}
-                className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1"
+                className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1.5 sm:p-1"
                 title="Previous Track"
               >
-                <SkipBack className="w-4 h-4 fill-current" />
+                <SkipBack className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
               </button>
               <button
                 onClick={togglePlay}
-                className="w-9 h-9 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer shrink-0"
                 title={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? (
-                  <Pause className="w-4 h-4 fill-white" />
+                  <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" />
                 ) : (
-                  <Play className="w-4 h-4 fill-white ml-0.5" />
+                  <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white ml-0.5" />
                 )}
               </button>
               <button
                 onClick={playNext}
-                className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1"
+                className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1.5 sm:p-1"
                 title="Next Track"
               >
-                <SkipForward className="w-4 h-4 fill-current" />
+                <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" />
               </button>
             </div>
 
-            {/* Time counters */}
-            <div className="font-mono text-[11px] text-[#E8BDB3]/50 flex items-center gap-1.5">
+            {/* Time counters (hidden on small mobile to prevent squishing, visible on desktop/tablet) */}
+            <div className="hidden md:flex font-mono text-[11px] text-[#E8BDB3]/50 items-center gap-1.5">
               <span>{formatTime(currentTime)}</span>
               <span>/</span>
               <span>{formatTime(duration)}</span>
@@ -132,9 +132,9 @@ export const PlayerBar: React.FC = () => {
           </div>
 
           {/* Right: Speed, A-B Loop Controls, Volume & Expand */}
-          <div className="flex items-center justify-end gap-3 w-1/3 max-w-[420px]">
-            {/* Playback Speed Selector */}
-            <div className="relative">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 md:w-1/3 md:max-w-[420px] shrink-0">
+            {/* Playback Speed Selector (Desktop) */}
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setShowSpeedMenu(!showSpeedMenu)}
                 className={`px-2 py-1 rounded-[4px] border border-[#282828] text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
@@ -179,7 +179,7 @@ export const PlayerBar: React.FC = () => {
               )}
             </div>
 
-            {/* A-B Looping Control Group */}
+            {/* A-B Looping Control Group (Desktop) */}
             <div className="hidden lg:flex items-center gap-1 bg-[#131313] border border-[#282828] rounded-[4px] p-0.5 text-[10px] font-mono">
               <button
                 onClick={() => setLoopA()}
@@ -223,6 +223,7 @@ export const PlayerBar: React.FC = () => {
               )}
             </div>
 
+            {/* Volume (Desktop) */}
             <div className="hidden sm:flex items-center gap-2 w-24">
               <button onClick={toggleMute} className="text-[#E8BDB3]/60 hover:text-white cursor-pointer">
                 {isMuted || volume === 0 ? (
@@ -238,9 +239,10 @@ export const PlayerBar: React.FC = () => {
               />
             </div>
 
+            {/* Expand Player Button */}
             <button
               onClick={() => setIsExpanded(true)}
-              className="p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
+              className="p-2 sm:p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
               title="Expand Player"
             >
               <Maximize2 className="w-4 h-4" />
