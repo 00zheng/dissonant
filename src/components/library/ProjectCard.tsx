@@ -3,6 +3,7 @@ import { Project } from '../../types';
 import { Card } from '../ui/Card';
 import { Play, MoreVertical, Edit2, FolderInput, Trash2 } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
+import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
 
 interface ProjectCardProps {
   project: Project;
@@ -50,7 +51,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       {/* Artwork Container - Visually Dominant */}
       <div className="relative aspect-square w-full bg-[#131313] overflow-hidden">
         <img
-          src={project.coverUrl}
+          src={project.coverUrl || NEUTRAL_COVER_FALLBACK}
           alt={project.title}
           className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
         />

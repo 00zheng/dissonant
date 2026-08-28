@@ -126,7 +126,7 @@ export const UploadTrackModal: React.FC<UploadTrackModalProps> = ({
         });
 
         // After successful upload, process metadata
-        const track = await processAudioUpload(uploads[i].file, project.artist, project.coverUrl, storagePath, trackId);
+        const track = await processAudioUpload(uploads[i].file, project.coverUrl, storagePath, trackId);
         updateUpload(i, { status: 'success', progress: 100, track });
         completedTracks.push(track);
       } catch (err: any) {

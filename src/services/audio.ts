@@ -58,8 +58,7 @@ export function extractAudioMetadata(file: File): Promise<{ duration: number; du
 
 export async function processAudioUpload(
   file: File,
-  projectArtist: string,
-  projectCoverUrl: string,
+  projectCoverUrl?: string,
   storagePath?: string,
   trackId?: string
 ): Promise<Track> {
@@ -75,23 +74,19 @@ export async function processAudioUpload(
   // Extract Audio Metadata
   const { duration, durationFormatted } = await extractAudioMetadata(file);
 
-  // Clean filename for title
+  // Clean filename for title (remove extension)
   const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
 
   // Local object URL for immediate playback in current session
   const localBlobUrl = URL.createObjectURL(file);
 
   const track: Track = {
-    id: id,
+    id,
     title: cleanTitle,
-    artist: projectArtist || 'Unknown Artist',
     duration: Math.round(duration),
     durationFormatted,
-    bpm: 120,
-    key: 'C',
-    versionTag: 'Take 1',
     audioUrl: localBlobUrl,
-    storagePath: storagePath,
+    storagePath,
     coverUrl: projectCoverUrl,
     hasAudio: true,
     isSample: false,

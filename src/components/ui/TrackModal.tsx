@@ -20,16 +20,16 @@ export const TrackModal: React.FC<TrackModalProps> = ({
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
   const [versionTag, setVersionTag] = useState('');
-  const [bpm, setBpm] = useState<number>(120);
-  const [key, setKey] = useState('C');
+  const [bpm, setBpm] = useState<string>('');
+  const [key, setKey] = useState('');
 
   useEffect(() => {
     if (track) {
-      setTitle(track.title);
-      setArtist(track.artist);
-      setVersionTag(track.versionTag || 'v1.0 Final');
-      setBpm(track.bpm || 120);
-      setKey(track.key || 'C');
+      setTitle(track.title || '');
+      setArtist(track.artist || '');
+      setVersionTag(track.versionTag || '');
+      setBpm(track.bpm ? String(track.bpm) : '');
+      setKey(track.key || '');
     }
   }, [track, isOpen]);
 
@@ -41,16 +41,16 @@ export const TrackModal: React.FC<TrackModalProps> = ({
 
     onSave(track.id, {
       title: title.trim(),
-      artist: artist.trim(),
-      versionTag: versionTag.trim(),
-      bpm: Number(bpm) || 120,
-      key: key.trim(),
+      artist: artist.trim() ? artist.trim() : undefined,
+      versionTag: versionTag.trim() ? versionTag.trim() : undefined,
+      bpm: bpm.trim() && !isNaN(Number(bpm)) ? Number(bpm) : undefined,
+      key: key.trim() ? key.trim() : undefined,
     });
     onClose();
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Rename Track Details">
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Track Details">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
@@ -67,7 +67,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
 
         <div>
           <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-            Artist / Performer
+            Artist / Performer (Optional)
           </label>
           <Input
             placeholder="e.g. Alex"
@@ -79,7 +79,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-              Version Tag
+              Version Tag (Optional)
             </label>
             <Input
               placeholder="Take 1, Demo, Mix 1"
@@ -90,22 +90,22 @@ export const TrackModal: React.FC<TrackModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-              BPM
+              BPM (Optional)
             </label>
             <Input
               type="number"
-              placeholder="120"
+              placeholder="e.g. 120"
               value={bpm}
-              onChange={(e) => setBpm(Number(e.target.value))}
+              onChange={(e) => setBpm(e.target.value)}
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-              Key
+              Key (Optional)
             </label>
             <Input
-              placeholder="Am"
+              placeholder="e.g. Am"
               value={key}
               onChange={(e) => setKey(e.target.value)}
             />

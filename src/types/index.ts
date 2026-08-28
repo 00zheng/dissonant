@@ -3,16 +3,16 @@ export interface Track {
   projectId?: string;
   order?: number;
   title: string;
-  artist: string;
+  artist?: string;
   duration: number; // in seconds
   durationFormatted: string; // e.g. "03:42"
-  bpm: number;
-  key: string;
-  versionTag: string; // e.g. "Take 1", "Draft"
+  bpm?: number;
+  key?: string;
+  versionTag?: string; // e.g. "Take 1", "Draft"
   stemsCount?: number;
   audioUrl: string;
   storagePath?: string;
-  coverUrl: string;
+  coverUrl?: string;
   hasAudio?: boolean; // true if backed by real Firebase Storage file or local IndexedDB Blob
   isSample?: boolean; // true if mock metadata only
 }
@@ -24,6 +24,7 @@ export interface Project {
   title: string;
   artist: string;
   coverUrl: string;
+  coverStoragePath?: string;
   category: ProjectCategory;
   folderId?: string;
   releaseDate: string;

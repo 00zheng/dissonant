@@ -32,5 +32,23 @@ service firebase.storage {
       // Delete: Users can delete their own files
       allow delete: if isOwner();
     }
+
+    // Path structure: users/{userId}/covers/{projectId}/{fileName}
+    match /users/{userId}/covers/{projectId}/{fileName} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function isValidImage() {
+        return request.resource.contentType.matches('image/jpeg|image/png|image/webp');
+      }
+      function isReasonableImageSize() {
+        return request.resource.size <= 10 * 1024 * 1024; // 10 Megabytes
+      }
+
+      allow read: if isOwner();
+      allow create: if isOwner() && isValidImage() && isReasonableImageSize();
+      allow update: if isOwner() && isValidImage() && isReasonableImageSize();
+      allow delete: if isOwner();
+    }
   }
 }

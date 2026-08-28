@@ -12,6 +12,8 @@ interface ProjectDetailViewProps {
   onEditTrack?: (track: Track) => void;
   onDeleteTrack?: (track: Track) => void;
   onReorderTracks?: (reorderedTracks: Track[]) => void;
+  onChangeCover?: (project: Project, file: File) => Promise<void>;
+  onRemoveCover?: (project: Project) => Promise<void>;
 }
 
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
@@ -23,6 +25,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   onEditTrack,
   onDeleteTrack,
   onReorderTracks,
+  onChangeCover,
+  onRemoveCover,
 }) => {
   return (
     <div className="pb-44 space-y-6 sm:space-y-8">
@@ -33,6 +37,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         onMoveProject={onMoveProject}
         onDeleteProject={onDeleteProject}
         onUploadTracks={onUploadTracks}
+        onChangeCover={onChangeCover}
+        onRemoveCover={onRemoveCover}
       />
 
       {/* Main Track List Container */}

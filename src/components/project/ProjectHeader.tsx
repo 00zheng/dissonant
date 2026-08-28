@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Project } from '../../types';
 import { Button } from '../ui/Button';
-import { Play, Pause, Shuffle, Plus, MoreHorizontal, Edit2, FolderInput, Trash2 } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  Shuffle,
+  Plus,
+  MoreHorizontal,
+  Edit2,
+  FolderInput,
+  Trash2,
+  Image as ImageIcon,
+  Loader2,
+  ImageOff
+} from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
+import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
 
 interface ProjectHeaderProps {
   project: Project;
@@ -10,6 +23,8 @@ interface ProjectHeaderProps {
   onMoveProject?: (project: Project) => void;
   onDeleteProject?: (project: Project) => void;
   onUploadTracks?: () => void;
+  onChangeCover?: (project: Project, file: File) => Promise<void>;
+  onRemoveCover?: (project: Project) => Promise<void>;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -18,10 +33,20 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onMoveProject,
   onDeleteProject,
   onUploadTracks,
+  onChangeCover,
+  onRemoveCover,
 }) => {
   const { currentProject, isPlaying, playTrack, togglePlay } = usePlayer();
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const hasCustomCover = Boolean(
+    project.coverUrl &&
+    project.coverUrl !== NEUTRAL_COVER_FALLBACK &&
+    !project.coverUrl.startsWith('data:image/svg+xml')
+  );
 
   const playableTrack = project.tracks?.find(
     (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
@@ -46,16 +71,88 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
     playTrack(playableTracks[randomIndex], project);
   };
 
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && onChangeCover) {
+      const file = e.target.files[0];
+      try {
+        setIsUploadingCover(true);
+        await onChangeCover(project, file);
+      } catch (err) {
+        console.error('Failed to change cover:', err);
+      } finally {
+        setIsUploadingCover(false);
+        if (coverInputRef.current) coverInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleTriggerCoverUpload = () => {
+    if (isUploadingCover) return;
+    coverInputRef.current?.click();
+  };
+
+  const handleRemoveCoverClick = async () => {
+    if (!onRemoveCover || isUploadingCover) return;
+    try {
+      setIsUploadingCover(true);
+      setShowMenu(false);
+      await onRemoveCover(project);
+    } catch (err) {
+      console.error('Failed to remove cover:', err);
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   return (
     <div className="bg-[#131313] border-b border-[#282828] p-5 sm:p-6 lg:p-10">
+      {/* Hidden File Input for Cover Art */}
+      <input
+        type="file"
+        ref={coverInputRef}
+        onChange={handleCoverFileChange}
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+      />
+
       <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-center sm:items-end max-w-7xl mx-auto text-center sm:text-left">
-        {/* Cover Art */}
-        <div className="w-36 h-36 sm:w-48 sm:h-48 lg:w-52 lg:h-52 rounded-[8px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 relative shadow-xl">
+        {/* Cover Art Container with Change Cover Overlay */}
+        <div
+          onClick={onChangeCover ? handleTriggerCoverUpload : undefined}
+          className={`w-36 h-36 sm:w-48 sm:h-48 lg:w-52 lg:h-52 rounded-[8px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 relative shadow-xl group ${
+            onChangeCover ? 'cursor-pointer' : ''
+          }`}
+          title={onChangeCover ? 'Click to change cover artwork' : undefined}
+        >
           <img
-            src={project.coverUrl}
+            src={project.coverUrl || NEUTRAL_COVER_FALLBACK}
             alt={project.title}
             className="w-full h-full object-cover"
           />
+
+          {/* Hover Overlay */}
+          {onChangeCover && (
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-3 text-center text-white">
+              {isUploadingCover ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin text-[#FF3B00]" />
+                  <span className="text-[11px] font-medium">Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="w-6 h-6 text-[#FF3B00]" />
+                  <span className="text-xs font-semibold">Change Cover</span>
+                  <span className="text-[10px] text-[#E8BDB3]/60">JPEG, PNG, WebP</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {isUploadingCover && (
+            <div className="absolute inset-0 bg-black/75 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-[#FF3B00]" />
+            </div>
+          )}
         </div>
 
         {/* Info Block */}
@@ -138,7 +235,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               </Button>
             )}
 
-            {(onEditProject || onMoveProject || onDeleteProject) && (
+            {(onEditProject || onMoveProject || onDeleteProject || onChangeCover) && (
               <div className="relative sm:ml-auto">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
@@ -150,9 +247,30 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
                 {showMenu && (
                   <div
-                    className="absolute right-0 top-11 z-30 w-44 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left"
+                    className="absolute right-0 top-11 z-30 w-48 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left select-none animate-in fade-in zoom-in-95 duration-100"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {onChangeCover && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          handleTriggerCoverUpload();
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        <span>{hasCustomCover ? 'Replace Cover Art' : 'Upload Cover Art'}</span>
+                      </button>
+                    )}
+                    {hasCustomCover && onRemoveCover && (
+                      <button
+                        onClick={handleRemoveCoverClick}
+                        className="w-full text-left px-3.5 py-2.5 text-[#E8BDB3]/80 hover:bg-[#1C1B1B] hover:text-white flex items-center gap-2.5 cursor-pointer"
+                      >
+                        <ImageOff className="w-4 h-4" />
+                        <span>Remove Cover Art</span>
+                      </button>
+                    )}
                     {onEditProject && (
                       <button
                         onClick={() => {

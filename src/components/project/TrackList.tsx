@@ -3,6 +3,7 @@ import { Track, Project } from '../../types';
 import { Play, Pause, MoreHorizontal, Download, GripVertical, Edit2, Trash2 } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { clsx } from 'clsx';
+import { DropdownPortal } from '../ui/DropdownPortal';
 
 interface TrackListProps {
   tracks: Track[];
@@ -21,19 +22,35 @@ export const TrackList: React.FC<TrackListProps> = ({
 }) => {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
+  const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const toggleMenu = (e: React.MouseEvent, trackId: string) => {
+  const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>, trackId: string) => {
     e.stopPropagation();
-    setActiveMenuTrackId(activeMenuTrackId === trackId ? null : trackId);
+    if (activeMenuTrackId === trackId) {
+      setActiveMenuTrackId(null);
+      setMenuTriggerRect(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setMenuTriggerRect(rect);
+      setActiveMenuTrackId(trackId);
+    }
   };
+
+  const closeMenu = () => {
+    setActiveMenuTrackId(null);
+    setMenuTriggerRect(null);
+  };
+
+  const activeTrack = tracks.find((t) => t.id === activeMenuTrackId) || null;
+  const activeTrackHasRealAudio =
+    activeTrack && activeTrack.hasAudio !== false && Boolean(activeTrack.audioUrl) && !activeTrack.isSample;
 
   // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    // Transparent or custom drag image if available
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -78,6 +95,14 @@ export const TrackList: React.FC<TrackListProps> = ({
           const isSelected = currentTrack?.id === track.id;
           const isTrackPlaying = isSelected && isPlaying;
           const orderNumber = String(index + 1).padStart(2, '0');
+
+          const secondaryMeta = [
+            track.artist,
+            track.bpm ? `${track.bpm} BPM` : '',
+            track.key,
+          ]
+            .filter(Boolean)
+            .join(' • ');
 
           return (
             <div
@@ -140,11 +165,11 @@ export const TrackList: React.FC<TrackListProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#E8BDB3]/50 truncate mt-0.5">
-                    {track.artist}
-                    {track.bpm ? ` • ${track.bpm} BPM` : ''}
-                    {track.key ? ` • ${track.key}` : ''}
-                  </p>
+                  {secondaryMeta && (
+                    <p className="text-[11px] text-[#E8BDB3]/50 truncate mt-0.5">
+                      {secondaryMeta}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -155,57 +180,13 @@ export const TrackList: React.FC<TrackListProps> = ({
                 </span>
 
                 {(onEditTrack || onDeleteTrack || hasRealAudio) && (
-                  <div className="relative">
-                    <button
-                      onClick={(e) => toggleMenu(e, track.id)}
-                      className="p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
-                      title="Track Options"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-
-                    {activeMenuTrackId === track.id && (
-                      <div
-                        className="absolute right-0 top-8 z-30 w-36 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {hasRealAudio && (
-                          <a
-                            href={track.audioUrl}
-                            download={`${track.title}.mp3`}
-                            className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download</span>
-                          </a>
-                        )}
-                        {onEditTrack && (
-                          <button
-                            onClick={() => {
-                              setActiveMenuTrackId(null);
-                              onEditTrack(track);
-                            }}
-                            className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Rename</span>
-                          </button>
-                        )}
-                        {onDeleteTrack && (
-                          <button
-                            onClick={() => {
-                              setActiveMenuTrackId(null);
-                              onDeleteTrack(track);
-                            }}
-                            className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Remove</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    onClick={(e) => toggleMenu(e, track.id)}
+                    className="p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
+                    title="Track Options"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
                 )}
               </div>
             </div>
@@ -227,7 +208,6 @@ export const TrackList: React.FC<TrackListProps> = ({
               <th className="py-3 px-2 w-8"></th>
               <th className="py-3 px-3 w-10 text-center">#</th>
               <th className="py-3 px-4">Title</th>
-              <th className="py-3 px-4 text-center">BPM / Key</th>
               <th className="py-3 px-4 text-right">Duration</th>
               <th className="py-3 px-4 w-20"></th>
             </tr>
@@ -239,6 +219,14 @@ export const TrackList: React.FC<TrackListProps> = ({
               const isTrackPlaying = isSelected && isPlaying;
               const isBeingDragged = draggedIndex === index;
               const isTargetDrop = dragOverIndex === index;
+
+              const secondaryMeta = [
+                track.artist,
+                track.bpm ? `${track.bpm} BPM` : '',
+                track.key,
+              ]
+                .filter(Boolean)
+                .join(' • ');
 
               return (
                 <tr
@@ -301,7 +289,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                     </div>
                   </td>
 
-                  {/* Title & Artist */}
+                  {/* Title & Optional Secondary Info */}
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-[4px] bg-[#131313] border border-[#282828] overflow-hidden shrink-0">
@@ -317,24 +305,14 @@ export const TrackList: React.FC<TrackListProps> = ({
                               {track.versionTag}
                             </span>
                           )}
-                          {!hasRealAudio && (
-                            <span className="px-1.5 py-0.2 bg-[#1C1B1B] border border-[#282828] text-[10px] text-[#E8BDB3]/40 rounded-[3px]">
-                              Sample Metadata
-                            </span>
-                          )}
                         </div>
-                        <p className="text-xs text-[#E8BDB3]/50 truncate">
-                          {track.artist}
-                        </p>
+                        {secondaryMeta && (
+                          <p className="text-xs text-[#E8BDB3]/50 truncate mt-0.5">
+                            {secondaryMeta}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  </td>
-
-                  {/* Key / BPM */}
-                  <td className="py-3 px-4 text-center text-xs text-[#E8BDB3]/70 font-mono">
-                    <span>{track.bpm || 120} BPM</span>
-                    <span className="text-[#E8BDB3]/40 mx-1.5">•</span>
-                    <span>{track.key || 'C'}</span>
                   </td>
 
                   {/* Duration */}
@@ -343,7 +321,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                   </td>
 
                   {/* Row Actions */}
-                  <td className="py-3 px-4 text-right relative">
+                  <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {hasRealAudio && (
                         <a
@@ -358,47 +336,13 @@ export const TrackList: React.FC<TrackListProps> = ({
                       )}
 
                       {(onEditTrack || onDeleteTrack) && (
-                        <div className="relative">
-                          <button
-                            onClick={(e) => toggleMenu(e, track.id)}
-                            className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer"
-                            title="Track Options"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </button>
-
-                          {activeMenuTrackId === track.id && (
-                            <div
-                              className="absolute right-0 top-8 z-30 w-36 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {onEditTrack && (
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuTrackId(null);
-                                    onEditTrack(track);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Rename</span>
-                                </button>
-                              )}
-                              {onDeleteTrack && (
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuTrackId(null);
-                                    onDeleteTrack(track);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Remove</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          onClick={(e) => toggleMenu(e, track.id)}
+                          className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer"
+                          title="Track Options"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </div>
                   </td>
@@ -408,7 +352,7 @@ export const TrackList: React.FC<TrackListProps> = ({
 
             {tracks.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-xs text-[#E8BDB3]/50">
+                <td colSpan={5} className="py-12 text-center text-xs text-[#E8BDB3]/50">
                   No tracks in this project yet. Click "Add Songs" above to upload MP3 or WAV files.
                 </td>
               </tr>
@@ -416,6 +360,56 @@ export const TrackList: React.FC<TrackListProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Global Dropdown Portal for Track Actions - Eliminates Overflow Clipping & Auto-Flips */}
+      <DropdownPortal
+        isOpen={Boolean(activeMenuTrackId && activeTrack)}
+        onClose={closeMenu}
+        triggerRect={menuTriggerRect}
+        className="w-36"
+      >
+        {activeTrack && (
+          <>
+            {activeTrackHasRealAudio && (
+              <a
+                href={activeTrack.audioUrl}
+                download={`${activeTrack.title}.mp3`}
+                className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+                onClick={closeMenu}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download</span>
+              </a>
+            )}
+            {onEditTrack && (
+              <button
+                onClick={() => {
+                  const trackToEdit = activeTrack;
+                  closeMenu();
+                  onEditTrack(trackToEdit);
+                }}
+                className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Rename</span>
+              </button>
+            )}
+            {onDeleteTrack && (
+              <button
+                onClick={() => {
+                  const trackToDelete = activeTrack;
+                  closeMenu();
+                  onDeleteTrack(trackToDelete);
+                }}
+                className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            )}
+          </>
+        )}
+      </DropdownPortal>
     </div>
   );
 };

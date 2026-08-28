@@ -27,8 +27,12 @@ import {
   fsMoveProject,
   fsDeleteTrack,
   fsReorderTracks,
+  fsUploadCoverImage,
+  fsDeleteCoverImage,
 } from './services/db';
 import { formatTotalDuration } from './services/audio';
+import { NEUTRAL_COVER_FALLBACK } from './data/mockData';
+import { getDownloadURL } from 'firebase/storage';
 import { LogIn, Lock, Music2, ShieldCheck, Database, Loader2, ArrowLeft } from 'lucide-react';
 
 function parseRoute(pathname: string): RouteState {
@@ -374,6 +378,43 @@ export const AppContent: React.FC = () => {
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
   };
 
+  // --- Cover Art Handlers ---
+  const handleChangeCover = async (project: Project, file: File) => {
+    if (!user) {
+      openAuth('signin');
+      return;
+    }
+    // Delete old storage cover if exists
+    if (project.coverStoragePath) {
+      await fsDeleteCoverImage(project.coverStoragePath);
+    }
+    const { task, storagePath } = fsUploadCoverImage(user.uid, project.id, file);
+    const snapshot = await task;
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+
+    const updatedProject: Project = {
+      ...project,
+      coverUrl: downloadUrl,
+      coverStoragePath: storagePath,
+    };
+    await fsSaveProject(user.uid, updatedProject);
+    setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+  };
+
+  const handleRemoveCover = async (project: Project) => {
+    if (!user) return;
+    if (project.coverStoragePath) {
+      await fsDeleteCoverImage(project.coverStoragePath);
+    }
+    const updatedProject: Project = {
+      ...project,
+      coverUrl: NEUTRAL_COVER_FALLBACK,
+      coverStoragePath: undefined,
+    };
+    await fsSaveProject(user.uid, updatedProject);
+    setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+  };
+
   // --- Deletion Handler ---
   const handleConfirmDelete = async () => {
     if (!user || !deleteTarget) return;
@@ -388,7 +429,8 @@ export const AppContent: React.FC = () => {
         navigate('/folders');
       }
     } else if (deleteTarget.type === 'project') {
-      await fsDeleteProject(user.uid, deleteTarget.id);
+      const proj = projects.find((p) => p.id === deleteTarget.id);
+      await fsDeleteProject(user.uid, deleteTarget.id, proj?.coverStoragePath);
       setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       if (route.type === 'project_detail' && route.projectId === deleteTarget.id) {
         navigate('/projects');
@@ -558,6 +600,8 @@ export const AppContent: React.FC = () => {
                 onEditTrack={handleOpenEditTrack}
                 onDeleteTrack={handlePromptDeleteTrack}
                 onReorderTracks={handleReorderTracks}
+                onChangeCover={handleChangeCover}
+                onRemoveCover={handleRemoveCover}
               />
             ) : (
               <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">

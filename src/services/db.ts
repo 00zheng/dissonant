@@ -232,16 +232,16 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
       projectId: data.projectId,
       order: data.order ?? 0,
       title: data.title || 'Untitled Track',
-      artist: data.artist || 'Unknown Artist',
+      artist: data.artist || undefined,
       duration: data.duration || 0,
       durationFormatted: data.durationFormatted || '00:00',
-      bpm: data.bpm || 120,
-      key: data.key || 'C',
-      versionTag: data.versionTag || 'Draft',
+      bpm: data.bpm || undefined,
+      key: data.key || undefined,
+      versionTag: data.versionTag || undefined,
       stemsCount: data.stemsCount,
       audioUrl: resolvedUrl,
       storagePath,
-      coverUrl: data.coverUrl || '',
+      coverUrl: data.coverUrl || undefined,
       hasAudio,
       isSample,
     };
@@ -265,6 +265,7 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
       title: data.title || '',
       artist: data.artist || '',
       coverUrl: data.coverUrl || '',
+      coverStoragePath: data.coverStoragePath || undefined,
       category: data.category || 'Album',
       folderId: data.folderId || undefined,
       releaseDate: data.releaseDate || '',
@@ -306,7 +307,8 @@ async function migrateLocalDataToFirestore(
       id: project.id,
       title: project.title,
       artist: project.artist,
-      coverUrl: project.coverUrl,
+      coverUrl: project.coverUrl || '',
+      coverStoragePath: project.coverStoragePath || null,
       category: project.category,
       folderId: project.folderId || null,
       releaseDate: project.releaseDate || '',
@@ -320,23 +322,26 @@ async function migrateLocalDataToFirestore(
     if (project.tracks && project.tracks.length > 0) {
       project.tracks.forEach((track, index) => {
         const trackRef = doc(db, 'users', userId, 'tracks', track.id);
-        batch.set(trackRef, {
+        const trackPayload: any = {
           id: track.id,
           projectId: project.id,
           order: index,
           title: track.title,
-          artist: track.artist,
-          duration: track.duration,
-          durationFormatted: track.durationFormatted,
-          bpm: track.bpm,
-          key: track.key,
-          versionTag: track.versionTag,
-          stemsCount: track.stemsCount || null,
-          audioUrl: track.audioUrl,
-          coverUrl: track.coverUrl,
+          duration: track.duration || 0,
+          durationFormatted: track.durationFormatted || '00:00',
+          audioUrl: track.audioUrl || '',
+          coverUrl: track.coverUrl || null,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        });
+        };
+        if (track.artist) trackPayload.artist = track.artist;
+        if (track.bpm) trackPayload.bpm = track.bpm;
+        if (track.key) trackPayload.key = track.key;
+        if (track.versionTag) trackPayload.versionTag = track.versionTag;
+        if (track.stemsCount) trackPayload.stemsCount = track.stemsCount;
+        if (track.storagePath) trackPayload.storagePath = track.storagePath;
+
+        batch.set(trackRef, trackPayload);
       });
     }
   }
@@ -386,7 +391,8 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
       id: project.id,
       title: project.title,
       artist: project.artist,
-      coverUrl: project.coverUrl,
+      coverUrl: project.coverUrl || '',
+      coverStoragePath: project.coverStoragePath || null,
       category: project.category,
       folderId: project.folderId || null,
       releaseDate: project.releaseDate || '',
@@ -407,26 +413,26 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
         track.storagePath ||
         (track.audioUrl?.startsWith('blob:') ? '' : track.audioUrl || '');
 
-      batch.set(
-        trackRef,
-        {
-          id: track.id,
-          projectId: project.id,
-          order: track.order ?? index,
-          title: track.title,
-          artist: track.artist,
-          duration: track.duration,
-          durationFormatted: track.durationFormatted,
-          bpm: track.bpm,
-          key: track.key,
-          versionTag: track.versionTag,
-          stemsCount: track.stemsCount || null,
-          audioUrl: firestoreAudioUrl,
-          coverUrl: track.coverUrl,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const trackPayload: any = {
+        id: track.id,
+        projectId: project.id,
+        order: track.order ?? index,
+        title: track.title,
+        duration: track.duration || 0,
+        durationFormatted: track.durationFormatted || '00:00',
+        audioUrl: firestoreAudioUrl,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (track.artist !== undefined) trackPayload.artist = track.artist || null;
+      if (track.bpm !== undefined) trackPayload.bpm = track.bpm || null;
+      if (track.key !== undefined) trackPayload.key = track.key || null;
+      if (track.versionTag !== undefined) trackPayload.versionTag = track.versionTag || null;
+      if (track.stemsCount !== undefined) trackPayload.stemsCount = track.stemsCount || null;
+      if (track.coverUrl !== undefined) trackPayload.coverUrl = track.coverUrl || null;
+      if (track.storagePath !== undefined) trackPayload.storagePath = track.storagePath || null;
+
+      batch.set(trackRef, trackPayload, { merge: true });
     });
     await batch.commit();
   }
@@ -434,9 +440,13 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
   return project;
 }
 
-export async function fsDeleteProject(userId: string, projectId: string): Promise<void> {
+export async function fsDeleteProject(userId: string, projectId: string, coverStoragePath?: string): Promise<void> {
   const projectRef = doc(db, 'users', userId, 'projects', projectId);
   await deleteDoc(projectRef);
+
+  if (coverStoragePath) {
+    await fsDeleteCoverImage(coverStoragePath);
+  }
 
   // Find all tracks belonging to this project
   const tracksCol = collection(db, 'users', userId, 'tracks');
@@ -445,7 +455,24 @@ export async function fsDeleteProject(userId: string, projectId: string): Promis
   const batch = writeBatch(db);
 
   for (const trackDoc of snap.docs) {
+    const trackData = trackDoc.data();
     batch.delete(trackDoc.ref);
+    if (trackData.audioUrl) {
+      // attempt delete from storage if user track
+      try {
+        let storagePath = trackData.audioUrl;
+        if (storagePath.startsWith('gs://')) {
+          const url = new URL(storagePath);
+          storagePath = url.pathname.slice(1);
+        }
+        if (!storagePath.startsWith('http') && storagePath.startsWith('users/')) {
+          const fileRef = ref(storage, storagePath);
+          await deleteObject(fileRef);
+        }
+      } catch (err) {
+        console.warn(`[Storage] Failed to delete audio file during project deletion:`, err);
+      }
+    }
     // Delete local IndexedDB audio blob
     await dbDeleteAudioBlob(trackDoc.id);
   }
@@ -471,26 +498,26 @@ export async function fsSaveTrack(userId: string, projectId: string, track: Trac
     track.storagePath ||
     (track.audioUrl?.startsWith('blob:') ? '' : track.audioUrl || '');
 
-  await setDoc(
-    trackRef,
-    {
-      id: track.id,
-      projectId,
-      order,
-      title: track.title,
-      artist: track.artist,
-      duration: track.duration,
-      durationFormatted: track.durationFormatted,
-      bpm: track.bpm,
-      key: track.key,
-      versionTag: track.versionTag,
-      stemsCount: track.stemsCount || null,
-      audioUrl: firestoreAudioUrl,
-      coverUrl: track.coverUrl,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const trackPayload: any = {
+    id: track.id,
+    projectId,
+    order,
+    title: track.title,
+    duration: track.duration || 0,
+    durationFormatted: track.durationFormatted || '00:00',
+    audioUrl: firestoreAudioUrl,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (track.artist !== undefined) trackPayload.artist = track.artist || null;
+  if (track.bpm !== undefined) trackPayload.bpm = track.bpm || null;
+  if (track.key !== undefined) trackPayload.key = track.key || null;
+  if (track.versionTag !== undefined) trackPayload.versionTag = track.versionTag || null;
+  if (track.stemsCount !== undefined) trackPayload.stemsCount = track.stemsCount || null;
+  if (track.coverUrl !== undefined) trackPayload.coverUrl = track.coverUrl || null;
+  if (track.storagePath !== undefined) trackPayload.storagePath = track.storagePath || null;
+
+  await setDoc(trackRef, trackPayload, { merge: true });
 }
 
 export async function fsDeleteTrack(userId: string, trackId: string, audioUrl?: string): Promise<void> {
@@ -524,6 +551,32 @@ export function fsUploadAudioFile(userId: string, trackId: string, file: File): 
   const fileRef = ref(storage, storagePath);
   const task = uploadBytesResumable(fileRef, file, { contentType: file.type || 'audio/wav' });
   return { task, storagePath };
+}
+
+export function fsUploadCoverImage(userId: string, projectId: string, file: File): { task: UploadTask, storagePath: string } {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `cover_${Date.now()}.${fileExt}`;
+  const storagePath = `users/${userId}/covers/${projectId}/${fileName}`;
+  const fileRef = ref(storage, storagePath);
+  const task = uploadBytesResumable(fileRef, file, { contentType: file.type || 'image/jpeg' });
+  return { task, storagePath };
+}
+
+export async function fsDeleteCoverImage(storagePath: string): Promise<void> {
+  if (!storagePath) return;
+  try {
+    let cleanPath = storagePath;
+    if (cleanPath.startsWith('gs://')) {
+      const url = new URL(cleanPath);
+      cleanPath = url.pathname.slice(1);
+    }
+    if (!cleanPath.startsWith('http')) {
+      const fileRef = ref(storage, cleanPath);
+      await deleteObject(fileRef);
+    }
+  } catch (err) {
+    console.warn(`[Storage] Failed to delete cover image:`, err);
+  }
 }
 
 export async function fsReorderTracks(userId: string, tracks: Track[]): Promise<void> {

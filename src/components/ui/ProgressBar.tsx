@@ -1,9 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { clsx } from 'clsx';
 
 interface ProgressBarProps {
   value: number; // 0 to 100
   onChange?: (value: number) => void;
+  onScrubStart?: () => void;
+  onScrub?: (value: number) => void;
+  onScrubEnd?: (value: number) => void;
   height?: number; // default 2px
   className?: string;
   loopAStartPct?: number; // 0 to 100
@@ -14,6 +17,9 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
   onChange,
+  onScrubStart,
+  onScrub,
+  onScrubEnd,
   height = 2,
   className,
   loopAStartPct,
@@ -21,13 +27,50 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   isLoopActive,
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!barRef.current || !onChange) return;
+  const calculatePercentage = (clientX: number) => {
+    if (!barRef.current) return 0;
     const rect = barRef.current.getBoundingClientRect();
-    const clickPos = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (clickPos / rect.width) * 100));
-    onChange(percentage);
+    const pos = clientX - rect.left;
+    return Math.max(0, Math.min(100, (pos / rect.width) * 100));
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onChange && !onScrubStart) return;
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    
+    const pct = calculatePercentage(e.clientX);
+    onScrubStart?.();
+    onScrub?.(pct);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const pct = calculatePercentage(e.clientX);
+    onScrub?.(pct);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    
+    const pct = calculatePercentage(e.clientX);
+    onScrubEnd?.(pct);
+    onChange?.(pct);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    
+    // On cancel, we might want to revert or just end where it was.
+    // Usually ending where it was is safer.
+    const pct = calculatePercentage(e.clientX);
+    onScrubEnd?.(pct);
   };
 
   const hasLoopRegion =
@@ -38,7 +81,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   return (
     <div
       ref={barRef}
-      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       className={clsx(
         'relative w-full cursor-pointer py-2 group flex items-center select-none',
         className
@@ -64,7 +110,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
         {/* Playhead Progress Fill */}
         <div
-          className="bg-[#FF3B00] h-full transition-all duration-75"
+          className={clsx("bg-[#FF3B00] h-full transition-all", isDragging ? 'duration-0' : 'duration-75')}
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
@@ -87,10 +133,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         </>
       )}
 
-      {/* Handle Knob (visible on hover) */}
-      {onChange && (
+      {/* Handle Knob (visible on hover or dragging) */}
+      {(onChange || onScrubStart) && (
         <div
-          className="absolute w-3 h-3 bg-white rounded-full shadow border border-[#FF3B00] opacity-0 group-hover:opacity-100 transition-opacity duration-150 transform -translate-x-1/2"
+          className={clsx(
+            "absolute w-3 h-3 bg-white rounded-full shadow border border-[#FF3B00] transition-opacity duration-150 transform -translate-x-1/2",
+            isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
           style={{ left: `${Math.min(100, Math.max(0, value))}%` }}
         />
       )}

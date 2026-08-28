@@ -3,29 +3,9 @@ import { Modal } from './Modal';
 import { Input } from './Input';
 import { Button } from './Button';
 import { Folder, Project, ProjectCategory } from '../../types';
+import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
 
 const CATEGORIES: ProjectCategory[] = ['Album', 'EP', 'Single', 'Stems', 'Demo'];
-
-const createSvgCover = (title: string, bg1: string = '#0E0E0E', bg2: string = '#1C1B1B', accent: string = '#FF3B00') => {
-  const encodedSvg = encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-      <defs>
-        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="${bg1}" />
-          <stop offset="100%" stop-color="${bg2}" />
-        </linearGradient>
-      </defs>
-      <rect width="400" height="400" fill="url(#g)" />
-      <rect x="30" y="30" width="340" height="340" fill="none" stroke="${accent}" stroke-width="1.5" stroke-opacity="0.3" />
-      <circle cx="200" cy="200" r="110" fill="none" stroke="${accent}" stroke-width="3" />
-      <circle cx="200" cy="200" r="40" fill="${accent}" />
-      <line x1="200" y1="30" x2="200" y2="370" stroke="${accent}" stroke-width="1" stroke-opacity="0.4" />
-      <line x1="30" y1="200" x2="370" y2="200" stroke="${accent}" stroke-width="1" stroke-opacity="0.4" />
-      <text x="45" y="355" font-family="sans-serif" font-size="20" font-weight="800" fill="#E5E2E1" letter-spacing="2">${title.toUpperCase()}</text>
-    </svg>
-  `);
-  return `data:image/svg+xml;utf8,${encodedSvg}`;
-};
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -81,7 +61,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       category,
       folderId: folderId || undefined,
       tags: parsedTags,
-      coverUrl: initialProject?.coverUrl || createSvgCover(title.trim()),
+      coverUrl: initialProject?.coverUrl || NEUTRAL_COVER_FALLBACK,
       tracksCount: initialProject?.tracksCount || 0,
       totalDuration: initialProject?.totalDuration || '00m 00s',
       releaseDate: initialProject?.releaseDate || new Date().toISOString().split('T')[0],
