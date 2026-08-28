@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-canvas: #000000;
+    --bg-canvas-alt: #131313;
+    --surface-lowest: #0E0E0E;
+    --surface-low: #1C1B1B;
+    --surface-default: #201F1F;
+    --surface-high: #2A2A2A;
+    --surface-highest: #353534;
+    --text-primary: #E5E2E1;
+    --text-muted: rgba(232, 189, 179, 0.6);
+    --accent-heat: #FF3B00;
+    --accent-container: #FF562D;
+    --border-subtle: #282828;
+    --border-accent: #5E3F38;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+  }
+
+  /* Custom typography classes per DESIGN.md */
+  .font-mono-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .font-label-caps {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .font-display-lg {
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .font-headline-lg {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .font-headline-md {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .font-body-lg {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+
+  .font-body-sm {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+}
+
+/* Custom Scrollbar for brutalist dark UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0E0E0E;
+}
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF3B00;
+}
