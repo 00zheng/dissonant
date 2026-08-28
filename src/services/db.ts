@@ -8,7 +8,8 @@ import {
   serverTimestamp,
   query,
   orderBy,
-  where
+  where,
+  deleteField
 } from 'firebase/firestore';
 import { ref, getDownloadURL, deleteObject, uploadBytesResumable, UploadTask } from 'firebase/storage';
 import { db, storage } from './firebase';
@@ -385,24 +386,27 @@ export async function fsDeleteFolder(userId: string, folderId: string): Promise<
 // Project Firestore Operations
 export async function fsSaveProject(userId: string, project: Project): Promise<Project> {
   const projectRef = doc(db, 'users', userId, 'projects', project.id);
-  await setDoc(
-    projectRef,
-    {
-      id: project.id,
-      title: project.title,
-      artist: project.artist,
-      coverUrl: project.coverUrl || '',
-      coverStoragePath: project.coverStoragePath || null,
-      category: project.category,
-      folderId: project.folderId || null,
-      releaseDate: project.releaseDate || '',
-      tags: project.tags || [],
-      tracksCount: project.tracks?.length || project.tracksCount || 0,
-      totalDuration: project.totalDuration || '00m 00s',
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const payload: any = {
+    id: project.id,
+    title: project.title,
+    artist: project.artist,
+    coverUrl: project.coverUrl || '',
+    category: project.category,
+    folderId: project.folderId || null,
+    releaseDate: project.releaseDate || '',
+    tags: project.tags || [],
+    tracksCount: project.tracks?.length || project.tracksCount || 0,
+    totalDuration: project.totalDuration || '00m 00s',
+    updatedAt: serverTimestamp(),
+  };
+
+  if (project.coverStoragePath) {
+    payload.coverStoragePath = project.coverStoragePath;
+  } else {
+    payload.coverStoragePath = deleteField();
+  }
+
+  await setDoc(projectRef, payload, { merge: true });
 
   // Save tracks if present
   if (project.tracks && project.tracks.length > 0) {

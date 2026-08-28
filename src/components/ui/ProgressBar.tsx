@@ -28,6 +28,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [internalValue, setInternalValue] = useState<number | null>(null);
 
   const calculatePercentage = (clientX: number) => {
     if (!barRef.current) return 0;
@@ -42,6 +43,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     e.currentTarget.setPointerCapture(e.pointerId);
     
     const pct = calculatePercentage(e.clientX);
+    setInternalValue(pct);
     onScrubStart?.();
     onScrub?.(pct);
   };
@@ -49,12 +51,14 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     const pct = calculatePercentage(e.clientX);
+    setInternalValue(pct);
     onScrub?.(pct);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     setIsDragging(false);
+    setInternalValue(null);
     e.currentTarget.releasePointerCapture(e.pointerId);
     
     const pct = calculatePercentage(e.clientX);
@@ -65,6 +69,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     setIsDragging(false);
+    setInternalValue(null);
     e.currentTarget.releasePointerCapture(e.pointerId);
     
     // On cancel, we might want to revert or just end where it was.
@@ -77,6 +82,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     loopAStartPct !== undefined &&
     loopBEndPct !== undefined &&
     loopAStartPct < loopBEndPct;
+
+  const displayValue = isDragging && internalValue !== null ? internalValue : value;
 
   return (
     <div
@@ -111,7 +118,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         {/* Playhead Progress Fill */}
         <div
           className={clsx("bg-[#FF3B00] h-full transition-all", isDragging ? 'duration-0' : 'duration-75')}
-          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, displayValue))}%` }}
         />
       </div>
 
@@ -140,7 +147,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             "absolute w-3 h-3 bg-white rounded-full shadow border border-[#FF3B00] transition-opacity duration-150 transform -translate-x-1/2",
             isDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}
-          style={{ left: `${Math.min(100, Math.max(0, value))}%` }}
+          style={{ left: `${Math.min(100, Math.max(0, displayValue))}%` }}
         />
       )}
     </div>

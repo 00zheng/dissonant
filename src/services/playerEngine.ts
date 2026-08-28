@@ -39,6 +39,7 @@ export class AudioPlayerEngine {
 
   constructor() {
     this.audio = new Audio();
+    this.audio.crossOrigin = 'anonymous';
     // Default audio properties
     this.audio.volume = this.volumeState;
     this.setAudioPreservesPitch();
@@ -164,6 +165,16 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('ended', () => {
+      if (
+        this.isLoopActiveState &&
+        this.loopAState !== null &&
+        this.loopBState !== null &&
+        this.loopAState < this.loopBState
+      ) {
+        this.audio.currentTime = this.loopAState;
+        this.play();
+        return;
+      }
       this.isPlayingState = false;
       this.notifyStateChange();
       this.endedListeners.forEach((cb) => cb());

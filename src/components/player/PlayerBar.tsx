@@ -4,6 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Gauge, Sh
 import { ProgressBar } from '../ui/ProgressBar';
 import { QueuePanel } from './QueuePanel';
 import { LoopEditor } from './LoopEditor';
+import { PlayerExpanded } from './PlayerExpanded';
 
 const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -41,6 +42,7 @@ export const PlayerBar: React.FC = () => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPreviewTime, setScrubPreviewTime] = useState(0);
   const [isQueuePanelOpen, setIsQueuePanelOpen] = useState(false);
+  const [isExpandedOpen, setIsExpandedOpen] = useState(false);
   if (!currentTrack) return null;
 
   const formatTime = (secs: number) => {
@@ -82,15 +84,19 @@ export const PlayerBar: React.FC = () => {
       {/* Player Controls Bar */}
       <div className="h-14 sm:h-16 px-3 sm:px-4 md:px-6 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Track Info Thumbnail */}
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-1 md:flex-initial md:w-1/3 md:min-w-[150px] md:max-w-[280px] min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[4px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0">
+        <div 
+          className="flex items-center gap-2.5 sm:gap-3 flex-1 md:flex-initial md:w-1/3 md:min-w-[150px] md:max-w-[280px] min-w-0 cursor-pointer group"
+          onClick={() => setIsExpandedOpen(true)}
+          title="Open Expanded Player"
+        >
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[4px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 group-hover:border-[#5E3F38] transition-colors">
             <img
               src={currentTrack.coverUrl || currentProject?.coverUrl}
               alt={currentTrack.title}
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="truncate min-w-0 pr-1">
+          <div className="truncate min-w-0 pr-1 group-hover:opacity-80 transition-opacity">
             <h4 className="text-xs sm:text-sm font-semibold text-[#E5E2E1] truncate">
               {currentTrack.title}
             </h4>
@@ -246,6 +252,9 @@ export const PlayerBar: React.FC = () => {
 
       <QueuePanel isOpen={isQueuePanelOpen} onClose={() => setIsQueuePanelOpen(false)} />
       <LoopEditor />
+      {isExpandedOpen && (
+        <PlayerExpanded onClose={() => setIsExpandedOpen(false)} />
+      )}
     </div>
   );
 };

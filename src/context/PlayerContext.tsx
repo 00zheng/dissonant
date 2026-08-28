@@ -51,12 +51,14 @@ const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 const generateShuffledContext = (project: Project, currentTrack: Track): Track[] => {
   if (!project.tracks) return [];
   const playable = project.tracks.filter(t => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample);
-  const others = playable.filter(t => t.id !== currentTrack.id);
-  for (let i = others.length - 1; i > 0; i--) {
+  const idx = playable.findIndex(t => t.id === currentTrack.id);
+  const remaining = idx !== -1 ? playable.slice(idx + 1) : playable.filter(t => t.id !== currentTrack.id);
+  
+  for (let i = remaining.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [others[i], others[j]] = [others[j], others[i]];
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
   }
-  return others;
+  return remaining;
 };
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

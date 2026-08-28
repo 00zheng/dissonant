@@ -48,7 +48,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !artist.trim()) return;
+    if (!title.trim()) return;
 
     const parsedTags = tags
       .split(',')
@@ -57,7 +57,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
     const projectData: Partial<Project> = {
       title: title.trim(),
-      artist: artist.trim(),
+      artist: artist.trim() || 'Unknown Artist',
       category,
       folderId: folderId || undefined,
       tags: parsedTags,
@@ -94,13 +94,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
         <div>
           <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-            Artist / Performer
+            Artist / Performer (Optional)
           </label>
           <Input
             placeholder="e.g. Alex"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
-            required
           />
         </div>
 
@@ -137,7 +136,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           <Button variant="secondary" type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="accent" type="submit" disabled={!title.trim() || !artist.trim()}>
+          <Button variant="accent" type="submit" disabled={!title.trim()}>
             {initialProject ? 'Save Changes' : 'Create Project'}
           </Button>
         </div>

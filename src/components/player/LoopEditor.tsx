@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js';
 import { usePlayer } from '../../context/PlayerContext';
@@ -83,7 +84,7 @@ export const LoopEditor: React.FC = () => {
 
   if (!isLoopEditorOpen || !currentTrack) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-sm flex flex-col justify-center items-center select-none overflow-hidden touch-none p-4 md:p-10">
       <div className="absolute top-6 right-6">
         <button
@@ -158,6 +159,7 @@ export const LoopEditor: React.FC = () => {
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
