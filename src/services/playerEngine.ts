@@ -1,3 +1,6 @@
+import processorUrl from '@soundtouchjs/audio-worklet/processor?url';
+import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
+
 export type PlayerStateCallback = (isPlaying: boolean) => void;
 export type TimeUpdateCallback = (currentTime: number) => void;
 export type DurationCallback = (duration: number) => void;
@@ -5,6 +8,7 @@ export type EndedCallback = () => void;
 export type ErrorCallback = (error: any) => void;
 export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
 export type PlaybackRateCallback = (rate: number) => void;
+export type PitchCallback = (pitch: number) => void;
 
 export class AudioPlayerEngine {
   private audio: HTMLAudioElement;
@@ -12,11 +16,19 @@ export class AudioPlayerEngine {
   private volumeState: number = 0.8;
   private isMutedState: boolean = false;
   private playbackRateState: number = 1.0;
+  private pitchSemitonesState: number = 0;
 
   // A-B Looping State
   private loopAState: number | null = null;
   private loopBState: number | null = null;
   private isLoopActiveState: boolean = false;
+
+  // Web Audio API graph
+  private audioContext: AudioContext | null = null;
+  private mediaSourceNode: MediaElementAudioSourceNode | null = null;
+  private soundTouchNode: SoundTouchNode | null = null;
+  private gainNode: GainNode | null = null;
+  private isWorkletRegistered: boolean = false;
 
   private stateListeners: Set<PlayerStateCallback> = new Set();
   private timeListeners: Set<TimeUpdateCallback> = new Set();
@@ -25,23 +37,88 @@ export class AudioPlayerEngine {
   private errorListeners: Set<ErrorCallback> = new Set();
   private loopListeners: Set<LoopStateCallback> = new Set();
   private rateListeners: Set<PlaybackRateCallback> = new Set();
+  private pitchListeners: Set<PitchCallback> = new Set();
 
   constructor() {
     this.audio = new Audio();
+    // Default audio properties
     this.audio.volume = this.volumeState;
     this.setAudioPreservesPitch();
     this.setupEventListeners();
   }
 
+  private async ensureAudioGraph() {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+    
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    if (!this.isWorkletRegistered) {
+      try {
+        await SoundTouchNode.register(this.audioContext, processorUrl);
+        this.isWorkletRegistered = true;
+      } catch (err) {
+        console.error('Failed to register SoundTouchNode worklet:', err);
+        return; // Fallback to normal playback gracefully
+      }
+    }
+
+    if (!this.soundTouchNode && this.isWorkletRegistered) {
+      try {
+        this.mediaSourceNode = this.audioContext.createMediaElementSource(this.audio);
+        this.soundTouchNode = new SoundTouchNode({ context: this.audioContext });
+        this.gainNode = this.audioContext.createGain();
+
+        // Connect graph: AudioElement -> SoundTouch -> Gain -> Destination
+        this.mediaSourceNode.connect(this.soundTouchNode);
+        this.soundTouchNode.connect(this.gainNode);
+        this.gainNode.connect(this.audioContext.destination);
+
+        // Apply current states
+        this.updateGraphNodes();
+      } catch (err) {
+        console.error('Failed to create audio graph:', err);
+      }
+    }
+  }
+
+  private updateGraphNodes() {
+    if (this.soundTouchNode && this.audioContext) {
+      // Use setTargetAtTime to prevent clicks, using a short time constant
+      const now = this.audioContext.currentTime;
+      this.soundTouchNode.pitchSemitones.setTargetAtTime(this.pitchSemitonesState, now, 0.05);
+      this.soundTouchNode.playbackRate.setTargetAtTime(this.playbackRateState, now, 0.05);
+    }
+    
+    if (this.gainNode && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      const targetVolume = this.isMutedState ? 0 : this.volumeState;
+      this.gainNode.gain.setTargetAtTime(targetVolume, now, 0.05);
+      
+      // When graph is active, standard audio element volume is bypassed in favor of gain node,
+      // but some browsers still respect it, so we can mute the source element or leave it max.
+      // Usually, createMediaElementSource "redirects" the audio so the source becomes silent
+      // on the regular output.
+    } else {
+      // Fallback
+      this.audio.volume = this.isMutedState ? 0 : this.volumeState;
+    }
+  }
+
   private setAudioPreservesPitch() {
+    // Disable native browser pitch correction so SoundTouch handles it cleanly
+    const preserves = false;
     if ('preservesPitch' in this.audio) {
-      (this.audio as any).preservesPitch = true;
+      (this.audio as any).preservesPitch = preserves;
     }
     if ('mozPreservesPitch' in this.audio) {
-      (this.audio as any).mozPreservesPitch = true;
+      (this.audio as any).mozPreservesPitch = preserves;
     }
     if ('webkitPreservesPitch' in this.audio) {
-      (this.audio as any).webkitPreservesPitch = true;
+      (this.audio as any).webkitPreservesPitch = preserves;
     }
   }
 
@@ -121,6 +198,9 @@ export class AudioPlayerEngine {
 
     this.audio.playbackRate = this.playbackRateState;
     this.setAudioPreservesPitch();
+    
+    // Ensure the Web Audio graph is ready (requires user gesture, which this call likely stems from)
+    await this.ensureAudioGraph();
 
     try {
       await this.audio.play();
@@ -137,6 +217,8 @@ export class AudioPlayerEngine {
     if (!this.audio.src) return;
     this.audio.playbackRate = this.playbackRateState;
     this.setAudioPreservesPitch();
+    
+    await this.ensureAudioGraph();
 
     try {
       await this.audio.play();
@@ -151,6 +233,10 @@ export class AudioPlayerEngine {
     this.audio.pause();
     this.isPlayingState = false;
     this.notifyStateChange();
+    if (this.audioContext && this.audioContext.state === 'running') {
+      // Suspending context here could save power, but it's optional
+      // this.audioContext.suspend(); 
+    }
   }
 
   public togglePlay(): void {
@@ -187,12 +273,12 @@ export class AudioPlayerEngine {
     if (clamped > 0 && this.isMutedState) {
       this.isMutedState = false;
     }
-    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
+    this.updateGraphNodes();
   }
 
   public setMuted(muted: boolean): void {
     this.isMutedState = muted;
-    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
+    this.updateGraphNodes();
   }
 
   public toggleMute(): void {
@@ -204,11 +290,24 @@ export class AudioPlayerEngine {
     this.playbackRateState = clamped;
     this.audio.playbackRate = clamped;
     this.setAudioPreservesPitch();
+    this.updateGraphNodes();
     this.rateListeners.forEach((cb) => cb(clamped));
   }
 
   public getPlaybackRate(): number {
     return this.playbackRateState;
+  }
+  
+  public setPitchSemitones(semitones: number): void {
+    // Limit between -12 and +12
+    const clamped = Math.max(-12, Math.min(12, Math.round(semitones)));
+    this.pitchSemitonesState = clamped;
+    this.updateGraphNodes();
+    this.pitchListeners.forEach((cb) => cb(clamped));
+  }
+  
+  public getPitchSemitones(): number {
+    return this.pitchSemitonesState;
   }
 
   public getCurrentTime(): number {
@@ -334,6 +433,11 @@ export class AudioPlayerEngine {
   public onPlaybackRateChange(cb: PlaybackRateCallback): () => void {
     this.rateListeners.add(cb);
     return () => this.rateListeners.delete(cb);
+  }
+  
+  public onPitchChange(cb: PitchCallback): () => void {
+    this.pitchListeners.add(cb);
+    return () => this.pitchListeners.delete(cb);
   }
 }
 

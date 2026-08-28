@@ -33,6 +33,8 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
     clearLoop,
     playbackRate,
     setPlaybackRate,
+    pitchSemitones,
+    setPitchSemitones,
   } = usePlayer();
 
   if (!currentTrack) return null;
@@ -114,7 +116,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
                 <Gauge className="w-4 h-4 text-[#FF3B00]" />
-                <span>Playback Speed (Pitch Preserved)</span>
+                <span>Playback Speed</span>
               </div>
               <span className="text-xs font-mono font-bold text-[#FF3B00]">
                 {playbackRate}x
@@ -135,6 +137,43 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
                   {rate}x
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Pitch Control Panel */}
+          <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
+                <span className="text-[#FF3B00]">♪</span>
+                <span>Pitch (Semitones)</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono font-bold text-[#FF3B00]">
+                  {pitchSemitones > 0 ? `+${pitchSemitones}` : pitchSemitones} semi
+                </span>
+                {pitchSemitones !== 0 && (
+                  <button
+                    onClick={() => setPitchSemitones(0)}
+                    className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-[3px] bg-[#2A2A2A] text-[#E8BDB3]/70 hover:text-white border border-[#282828] transition-colors"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-xs font-mono text-[#E8BDB3]/40">-12</span>
+              <input
+                type="range"
+                min="-12"
+                max="12"
+                step="1"
+                value={pitchSemitones}
+                onChange={(e) => setPitchSemitones(parseInt(e.target.value, 10))}
+                className="flex-1 h-1.5 bg-[#1C1B1B] rounded-full appearance-none cursor-pointer border border-[#282828] accent-[#FF3B00]"
+              />
+              <span className="text-xs font-mono text-[#E8BDB3]/40">+12</span>
             </div>
           </div>
 
@@ -241,7 +280,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
       {/* Footer Meta */}
       <div className="flex items-center justify-between font-mono-label text-xs text-[#E8BDB3]/40 border-t border-[#282828] pt-4">
         <span>PROJECT: {currentProject?.title ?? 'STANDALONE TRACK'}</span>
-        <span>RATE: {playbackRate}x (PITCH PRESERVED)</span>
+        <span>RATE: {playbackRate}x | PITCH: {pitchSemitones > 0 ? `+${pitchSemitones}` : pitchSemitones}</span>
       </div>
     </div>
   );

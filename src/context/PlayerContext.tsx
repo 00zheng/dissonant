@@ -14,6 +14,7 @@ interface PlayerContextType {
   loopB: number | null;
   isLoopActive: boolean;
   playbackRate: number;
+  pitchSemitones: number;
   playTrack: (track: Track, project?: Project) => void;
   togglePlay: () => void;
   seek: (seconds: number) => void;
@@ -26,6 +27,7 @@ interface PlayerContextType {
   toggleLoopActive: () => void;
   clearLoop: () => void;
   setPlaybackRate: (rate: number) => void;
+  setPitchSemitones: (semitones: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -39,6 +41,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMutedState] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1.0);
+  const [pitchSemitones, setPitchSemitonesState] = useState(0);
 
   // A-B Loop States
   const [loopA, setLoopAState] = useState<number | null>(null);
@@ -81,6 +84,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setPlaybackRateState(rate);
     });
 
+    const unsubPitch = playerEngine.onPitchChange((pitch) => {
+      setPitchSemitonesState(pitch);
+    });
+
     const unsubEnded = playerEngine.onEnded(() => {
       // Auto-advance to next track in project track order
       const proj = currentProjectRef.current;
@@ -106,6 +113,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubDuration();
       unsubLoop();
       unsubRate();
+      unsubPitch();
       unsubEnded();
     };
   }, []);
@@ -206,6 +214,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playerEngine.setPlaybackRate(rate);
   }, []);
 
+  const setPitchSemitones = useCallback((semitones: number) => {
+    playerEngine.setPitchSemitones(semitones);
+  }, []);
+
   return (
     <PlayerContext.Provider
       value={{
@@ -220,6 +232,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loopB,
         isLoopActive,
         playbackRate,
+        pitchSemitones,
         playTrack,
         togglePlay,
         seek,
@@ -232,6 +245,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleLoopActive,
         clearLoop,
         setPlaybackRate,
+        setPitchSemitones,
       }}
     >
       {children}
