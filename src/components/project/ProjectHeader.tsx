@@ -9,6 +9,7 @@ interface ProjectHeaderProps {
   onEditProject?: (project: Project) => void;
   onMoveProject?: (project: Project) => void;
   onDeleteProject?: (project: Project) => void;
+  onUploadTracks?: () => void;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -16,6 +17,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onEditProject,
   onMoveProject,
   onDeleteProject,
+  onUploadTracks,
 }) => {
   const { currentProject, isPlaying, playTrack, togglePlay } = usePlayer();
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
@@ -24,7 +26,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const handleMainPlay = () => {
     if (isPlayingThisProject) {
       togglePlay();
-    } else if (project.tracks.length > 0) {
+    } else if (project.tracks && project.tracks.length > 0) {
       playTrack(project.tracks[0], project);
     }
   };
@@ -53,7 +55,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           </div>
 
           {/* Tags */}
-          {project.tags.length > 0 && (
+          {project.tags && project.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-1">
               {project.tags.map((tag) => (
                 <span
@@ -105,10 +107,12 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               <span>Shuffle</span>
             </Button>
 
-            <Button variant="secondary" size="md" className="gap-2">
-              <Plus className="w-4 h-4" />
-              <span>Add Songs</span>
-            </Button>
+            {onUploadTracks && (
+              <Button variant="secondary" size="md" onClick={onUploadTracks} className="gap-2">
+                <Plus className="w-4 h-4" />
+                <span>Add Songs</span>
+              </Button>
+            )}
 
             {(onEditProject || onMoveProject || onDeleteProject) && (
               <div className="relative ml-auto">

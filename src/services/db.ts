@@ -1,10 +1,11 @@
-import { Folder, Project } from '../types';
+import { Folder, Project, Track } from '../types';
 import { MOCK_FOLDERS, MOCK_PROJECTS } from '../data/mockData';
 
 const DB_NAME = 'dissonant_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_FOLDERS = 'folders';
 const STORE_PROJECTS = 'projects';
+const STORE_AUDIO = 'audio_files';
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -17,6 +18,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
         db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_AUDIO)) {
+        db.createObjectStore(STORE_AUDIO);
       }
     };
 
@@ -41,6 +45,15 @@ export async function initDB(): Promise<{ folders: Folder[]; projects: Project[]
 
   const folders = await getAllItems<Folder>(db, STORE_FOLDERS);
   const projects = await getAllItems<Project>(db, STORE_PROJECTS);
+
+  // Resolve dynamic object URLs for tracks stored in IndexedDB
+  for (const project of projects) {
+    if (project.tracks) {
+      for (const track of project.tracks) {
+        track.audioUrl = await dbResolveTrackAudioUrl(track);
+      }
+    }
+  }
 
   return { folders, projects };
 }
@@ -123,6 +136,17 @@ export async function dbSaveProject(project: Project): Promise<Project> {
 
 export async function dbDeleteProject(projectId: string): Promise<void> {
   const db = await openDB();
+  
+  // Delete project and associated track audio blobs
+  const projects = await getAllItems<Project>(db, STORE_PROJECTS);
+  const project = projects.find((p) => p.id === projectId);
+  
+  if (project && project.tracks) {
+    for (const track of project.tracks) {
+      await dbDeleteAudioBlob(track.id);
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_PROJECTS, 'readwrite');
     const store = tx.objectStore(STORE_PROJECTS);
@@ -152,4 +176,47 @@ export async function dbMoveProject(projectId: string, folderId?: string): Promi
     putReq.onsuccess = () => resolve(updatedProject);
     putReq.onerror = () => reject(putReq.error);
   });
+}
+
+// --- Binary Audio File Blob Storage ---
+
+export async function dbSaveAudioBlob(trackId: string, blob: Blob): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_AUDIO, 'readwrite');
+    const store = tx.objectStore(STORE_AUDIO);
+    const request = store.put(blob, trackId);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function dbGetAudioBlob(trackId: string): Promise<Blob | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_AUDIO, 'readonly');
+    const store = tx.objectStore(STORE_AUDIO);
+    const request = store.get(trackId);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function dbDeleteAudioBlob(trackId: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_AUDIO, 'readwrite');
+    const store = tx.objectStore(STORE_AUDIO);
+    const request = store.delete(trackId);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function dbResolveTrackAudioUrl(track: Track): Promise<string> {
+  const blob = await dbGetAudioBlob(track.id);
+  if (blob) {
+    return URL.createObjectURL(blob);
+  }
+  return track.audioUrl;
 }

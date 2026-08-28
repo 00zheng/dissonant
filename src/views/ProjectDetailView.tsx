@@ -1,5 +1,5 @@
 import React from 'react';
-import { Project } from '../types';
+import { Project, Track } from '../types';
 import { ProjectHeader } from '../components/project/ProjectHeader';
 import { TrackList } from '../components/project/TrackList';
 
@@ -8,6 +8,10 @@ interface ProjectDetailViewProps {
   onEditProject?: (project: Project) => void;
   onMoveProject?: (project: Project) => void;
   onDeleteProject?: (project: Project) => void;
+  onUploadTracks?: () => void;
+  onEditTrack?: (track: Track) => void;
+  onDeleteTrack?: (track: Track) => void;
+  onReorderTracks?: (reorderedTracks: Track[]) => void;
 }
 
 export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
@@ -15,6 +19,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   onEditProject,
   onMoveProject,
   onDeleteProject,
+  onUploadTracks,
+  onEditTrack,
+  onDeleteTrack,
+  onReorderTracks,
 }) => {
   return (
     <div className="pb-36 space-y-8">
@@ -24,6 +32,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         onEditProject={onEditProject}
         onMoveProject={onMoveProject}
         onDeleteProject={onDeleteProject}
+        onUploadTracks={onUploadTracks}
       />
 
       {/* Main Track List Container */}
@@ -36,7 +45,13 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         </div>
 
         <div className="bg-[#131313] border border-[#282828] rounded-[8px] overflow-hidden">
-          <TrackList tracks={project.tracks || []} project={project} />
+          <TrackList
+            tracks={project.tracks || []}
+            project={project}
+            onEditTrack={onEditTrack}
+            onDeleteTrack={onDeleteTrack}
+            onReorderTracks={onReorderTracks}
+          />
         </div>
       </div>
     </div>

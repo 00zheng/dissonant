@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlayerProvider } from './context/PlayerContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -10,7 +10,9 @@ import { FolderModal } from './components/ui/FolderModal';
 import { ProjectModal } from './components/ui/ProjectModal';
 import { MoveProjectModal } from './components/ui/MoveProjectModal';
 import { ConfirmModal } from './components/ui/ConfirmModal';
-import { Folder, Project, ViewMode } from './types';
+import { UploadTrackModal } from './components/ui/UploadTrackModal';
+import { TrackModal } from './components/ui/TrackModal';
+import { Folder, Project, Track, ViewMode } from './types';
 import {
   initDB,
   dbSaveFolder,
@@ -18,7 +20,9 @@ import {
   dbSaveProject,
   dbDeleteProject,
   dbMoveProject,
+  dbDeleteAudioBlob,
 } from './services/db';
+import { processAudioUpload, formatTotalDuration } from './services/audio';
 
 export const AppContent: React.FC = () => {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -40,11 +44,16 @@ export const AppContent: React.FC = () => {
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [movingProject, setMovingProject] = useState<Project | null>(null);
 
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [trackModalOpen, setTrackModalOpen] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'folder' | 'project';
+    type: 'folder' | 'project' | 'track';
     id: string;
     name: string;
+    item?: Track;
   } | null>(null);
 
   // Initialize DB on Mount
@@ -179,7 +188,75 @@ export const AppContent: React.FC = () => {
     setConfirmModalOpen(true);
   };
 
-  // --- Delete Handler ---
+  // --- Track Handlers ---
+  const handleOpenUploadTracks = () => {
+    if (!selectedProject) return;
+    setUploadModalOpen(true);
+  };
+
+  const handleUploadTracks = async (files: File[]) => {
+    if (!selectedProject) return;
+
+    const newTracks: Track[] = [];
+    for (const file of files) {
+      const track = await processAudioUpload(file, selectedProject.artist, selectedProject.coverUrl);
+      newTracks.push(track);
+    }
+
+    const updatedTracks = [...(selectedProject.tracks || []), ...newTracks];
+    const updatedProject: Project = {
+      ...selectedProject,
+      tracks: updatedTracks,
+      tracksCount: updatedTracks.length,
+      totalDuration: formatTotalDuration(updatedTracks),
+    };
+
+    await dbSaveProject(updatedProject);
+    setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    setSelectedProject(updatedProject);
+  };
+
+  const handleOpenEditTrack = (track: Track) => {
+    setEditingTrack(track);
+    setTrackModalOpen(true);
+  };
+
+  const handleSaveTrack = async (trackId: string, data: Partial<Track>) => {
+    if (!selectedProject) return;
+
+    const updatedTracks = (selectedProject.tracks || []).map((t) =>
+      t.id === trackId ? { ...t, ...data } : t
+    );
+
+    const updatedProject: Project = {
+      ...selectedProject,
+      tracks: updatedTracks,
+    };
+
+    await dbSaveProject(updatedProject);
+    setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    setSelectedProject(updatedProject);
+  };
+
+  const handlePromptDeleteTrack = (track: Track) => {
+    setDeleteTarget({ type: 'track', id: track.id, name: track.title, item: track });
+    setConfirmModalOpen(true);
+  };
+
+  const handleReorderTracks = async (reorderedTracks: Track[]) => {
+    if (!selectedProject) return;
+
+    const updatedProject: Project = {
+      ...selectedProject,
+      tracks: reorderedTracks,
+    };
+
+    await dbSaveProject(updatedProject);
+    setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    setSelectedProject(updatedProject);
+  };
+
+  // --- Deletion Handler ---
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -199,7 +276,21 @@ export const AppContent: React.FC = () => {
         setSelectedProject(null);
         setCurrentView('library');
       }
+    } else if (deleteTarget.type === 'track' && selectedProject) {
+      await dbDeleteAudioBlob(deleteTarget.id);
+      const updatedTracks = (selectedProject.tracks || []).filter((t) => t.id !== deleteTarget.id);
+      const updatedProject: Project = {
+        ...selectedProject,
+        tracks: updatedTracks,
+        tracksCount: updatedTracks.length,
+        totalDuration: formatTotalDuration(updatedTracks),
+      };
+
+      await dbSaveProject(updatedProject);
+      setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+      setSelectedProject(updatedProject);
     }
+
     setDeleteTarget(null);
   };
 
@@ -245,6 +336,10 @@ export const AppContent: React.FC = () => {
               onEditProject={handleOpenEditProject}
               onMoveProject={handleOpenMoveProject}
               onDeleteProject={handlePromptDeleteProject}
+              onUploadTracks={handleOpenUploadTracks}
+              onEditTrack={handleOpenEditTrack}
+              onDeleteTrack={handlePromptDeleteTrack}
+              onReorderTracks={handleReorderTracks}
             />
           ) : (
             <LibraryView
@@ -308,17 +403,37 @@ export const AppContent: React.FC = () => {
         folders={computedFolders}
       />
 
+      <UploadTrackModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onUpload={handleUploadTracks}
+        project={selectedProject}
+      />
+
+      <TrackModal
+        isOpen={trackModalOpen}
+        onClose={() => setTrackModalOpen(false)}
+        onSave={handleSaveTrack}
+        track={editingTrack}
+      />
+
       <ConfirmModal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
         onConfirm={handleConfirmDelete}
         title={
-          deleteTarget?.type === 'folder' ? 'Delete Folder' : 'Delete Project'
+          deleteTarget?.type === 'folder'
+            ? 'Delete Folder'
+            : deleteTarget?.type === 'project'
+            ? 'Delete Project'
+            : 'Remove Track'
         }
         message={
           deleteTarget?.type === 'folder'
             ? `Are you sure you want to delete the folder "${deleteTarget?.name}"? Any projects inside will remain intact in your main library.`
-            : `Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`
+            : deleteTarget?.type === 'project'
+            ? `Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`
+            : `Are you sure you want to remove "${deleteTarget?.name}" from this project?`
         }
       />
     </div>
