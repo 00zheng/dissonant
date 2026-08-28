@@ -78,33 +78,78 @@ export async function dbDeleteAudioBlob(trackId: string): Promise<void> {
   });
 }
 
-export async function dbResolveTrackAudioUrl(track: Track): Promise<string> {
-  // If we already have an HTTP/HTTPS URL or GS URL, resolve via Cloud Storage
-  if (track.audioUrl && (track.audioUrl.startsWith('http') || track.audioUrl.startsWith('gs://') || track.audioUrl.startsWith('users/'))) {
-    try {
-      // If it's a full URL or a storage path, we can get a download URL
-      // (Assuming track.audioUrl stores the path like users/{userId}/tracks/{trackId}/file.wav)
-      let storagePath = track.audioUrl;
-      // Extract path if it's a gs:// URL
-      if (storagePath.startsWith('gs://')) {
-        const url = new URL(storagePath);
-        storagePath = url.pathname.slice(1); // remove leading slash
+export async function resolveTrackAudio(
+  trackId: string,
+  rawAudioUrl?: string
+): Promise<{ resolvedUrl: string; hasAudio: boolean; isSample: boolean; storagePath?: string }> {
+  // 1. Check local IndexedDB binary cache first for instant playback
+  try {
+    const blob = await dbGetAudioBlob(trackId);
+    if (blob && blob.size > 0) {
+      const storagePath =
+        rawAudioUrl && (rawAudioUrl.startsWith('users/') || rawAudioUrl.startsWith('gs://'))
+          ? rawAudioUrl
+          : undefined;
+      return {
+        resolvedUrl: URL.createObjectURL(blob),
+        hasAudio: true,
+        isSample: false,
+        storagePath,
+      };
+    }
+  } catch (err) {
+    console.warn(`[IDB] Error checking audio blob for ${trackId}:`, err);
+  }
+
+  // 2. Check if rawAudioUrl is a valid Firebase Storage path or download URL
+  if (rawAudioUrl) {
+    let storagePath = rawAudioUrl;
+    if (storagePath.startsWith('gs://')) {
+      const url = new URL(storagePath);
+      storagePath = url.pathname.slice(1);
+    }
+
+    if (storagePath.startsWith('users/')) {
+      try {
+        const fileRef = ref(storage, storagePath);
+        const downloadUrl = await getDownloadURL(fileRef);
+        return {
+          resolvedUrl: downloadUrl,
+          hasAudio: true,
+          isSample: false,
+          storagePath,
+        };
+      } catch (err) {
+        console.warn(`[Storage] Could not resolve storage path "${storagePath}" for track ${trackId}:`, err);
+        return {
+          resolvedUrl: '',
+          hasAudio: false,
+          isSample: true,
+          storagePath,
+        };
       }
-      
-      const fileRef = ref(storage, storagePath);
-      return await getDownloadURL(fileRef);
-    } catch (err) {
-      console.warn(`[Storage] Failed to resolve download URL for ${track.id}:`, err);
-      // Fallback to local IndexedDB if resolution fails, just in case
+    }
+
+    if (storagePath.startsWith('https://firebasestorage.googleapis.com')) {
+      return {
+        resolvedUrl: storagePath,
+        hasAudio: true,
+        isSample: false,
+      };
     }
   }
 
-  // Fallback to local IndexedDB
-  const blob = await dbGetAudioBlob(track.id);
-  if (blob) {
-    return URL.createObjectURL(blob);
-  }
-  return track.audioUrl;
+  // 3. Fallback: Only mock/sample metadata exists
+  return {
+    resolvedUrl: '',
+    hasAudio: false,
+    isSample: true,
+  };
+}
+
+export async function dbResolveTrackAudioUrl(track: Track): Promise<string> {
+  const result = await resolveTrackAudio(track.id, track.storagePath || track.audioUrl);
+  return result.resolvedUrl;
 }
 
 // Get local IndexedDB folders and projects (used for migration)
@@ -174,6 +219,14 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
 
   for (const trackDoc of tracksSnap.docs) {
     const data = trackDoc.data();
+    const rawAudioUrl = data.audioUrl || '';
+
+    // Check whether track has real audio in Storage / IndexedDB or is mock metadata
+    const { resolvedUrl, hasAudio, isSample, storagePath } = await resolveTrackAudio(
+      trackDoc.id,
+      rawAudioUrl
+    );
+
     const track: Track = {
       id: trackDoc.id,
       projectId: data.projectId,
@@ -186,12 +239,12 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
       key: data.key || 'C',
       versionTag: data.versionTag || 'Draft',
       stemsCount: data.stemsCount,
-      audioUrl: data.audioUrl || '',
+      audioUrl: resolvedUrl,
+      storagePath,
       coverUrl: data.coverUrl || '',
+      hasAudio,
+      isSample,
     };
-
-    // Check if local binary audio blob exists in IndexedDB
-    track.audioUrl = await dbResolveTrackAudioUrl(track);
 
     const projectTracks = tracksMap.get(track.projectId!) || [];
     projectTracks.push(track);
@@ -350,6 +403,10 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
     const batch = writeBatch(db);
     project.tracks.forEach((track, index) => {
       const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+      const firestoreAudioUrl =
+        track.storagePath ||
+        (track.audioUrl?.startsWith('blob:') ? '' : track.audioUrl || '');
+
       batch.set(
         trackRef,
         {
@@ -364,7 +421,7 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
           key: track.key,
           versionTag: track.versionTag,
           stemsCount: track.stemsCount || null,
-          audioUrl: track.audioUrl,
+          audioUrl: firestoreAudioUrl,
           coverUrl: track.coverUrl,
           updatedAt: serverTimestamp(),
         },
@@ -410,6 +467,10 @@ export async function fsMoveProject(userId: string, projectId: string, folderId?
 // Track Firestore Operations
 export async function fsSaveTrack(userId: string, projectId: string, track: Track, order: number): Promise<void> {
   const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+  const firestoreAudioUrl =
+    track.storagePath ||
+    (track.audioUrl?.startsWith('blob:') ? '' : track.audioUrl || '');
+
   await setDoc(
     trackRef,
     {
@@ -424,7 +485,7 @@ export async function fsSaveTrack(userId: string, projectId: string, track: Trac
       key: track.key,
       versionTag: track.versionTag,
       stemsCount: track.stemsCount || null,
-      audioUrl: track.audioUrl,
+      audioUrl: firestoreAudioUrl,
       coverUrl: track.coverUrl,
       updatedAt: serverTimestamp(),
     },

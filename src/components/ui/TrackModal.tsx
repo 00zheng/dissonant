@@ -70,7 +70,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
             Artist / Performer
           </label>
           <Input
-            placeholder="Artist"
+            placeholder="e.g. Alex"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
           />
@@ -82,7 +82,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
               Version Tag
             </label>
             <Input
-              placeholder="v1.0 Master"
+              placeholder="Take 1, Demo, Mix 1"
               value={versionTag}
               onChange={(e) => setVersionTag(e.target.value)}
             />

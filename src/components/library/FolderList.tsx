@@ -27,21 +27,6 @@ export const FolderList: React.FC<FolderListProps> = ({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Create New Folder Card */}
-      {onCreateFolder && (
-        <button
-          onClick={onCreateFolder}
-          className="p-5 flex flex-col items-center justify-center gap-3 rounded-[8px] border border-dashed border-[#282828] hover:border-[#FF3B00]/60 bg-[#0E0E0E] hover:bg-[#131313] transition-all cursor-pointer group min-h-[160px]"
-        >
-          <div className="w-10 h-10 rounded-full bg-[#1C1B1B] border border-[#282828] flex items-center justify-center group-hover:border-[#FF3B00] transition-colors">
-            <Plus className="w-5 h-5 text-[#E8BDB3]/70 group-hover:text-[#FF3B00]" />
-          </div>
-          <span className="text-xs font-semibold text-[#E8BDB3]/80 group-hover:text-white">
-            New Folder
-          </span>
-        </button>
-      )}
-
       {folders.map((folder) => (
         <Card
           key={folder.id}
@@ -120,6 +105,15 @@ export const FolderList: React.FC<FolderListProps> = ({
           </div>
         </Card>
       ))}
+
+      {folders.length === 0 && (
+        <div className="col-span-full py-16 text-center border border-dashed border-[#282828] rounded-[8px] bg-[#0E0E0E]">
+          <p className="text-base text-[#E5E2E1] font-semibold">No Folders Found</p>
+          <p className="text-xs text-[#E8BDB3]/50 mt-1">
+            Create a folder to start organizing your music projects.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

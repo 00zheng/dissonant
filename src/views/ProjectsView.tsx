@@ -1,15 +1,12 @@
 import React from 'react';
-import { Project, ProjectCategory } from '../types';
+import { Project } from '../types';
 import { ProjectGrid } from '../components/library/ProjectGrid';
 import { Button } from '../components/ui/Button';
-import { Chip } from '../components/ui/Chip';
 import { Plus, Disc } from 'lucide-react';
 
 interface ProjectsViewProps {
   projects: Project[];
   searchQuery?: string;
-  activeCategory: string;
-  onCategoryChange: (category: string) => void;
   onProjectSelect: (project: Project) => void;
   onCreateProject: () => void;
   onEditProject?: (project: Project) => void;
@@ -17,13 +14,9 @@ interface ProjectsViewProps {
   onDeleteProject?: (project: Project) => void;
 }
 
-const CATEGORIES = ['All', 'Album', 'EP', 'Single', 'Stems', 'Demo'];
-
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
   projects,
   searchQuery = '',
-  activeCategory,
-  onCategoryChange,
   onProjectSelect,
   onCreateProject,
   onEditProject,
@@ -31,11 +24,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onDeleteProject,
 }) => {
   const filteredProjects = projects.filter((project) => {
-    // 1. Category Filter
-    if (activeCategory !== 'All' && project.category.toLowerCase() !== activeCategory.toLowerCase()) {
-      return false;
-    }
-    // 2. Search Query Filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -46,11 +34,6 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
     }
     return true;
   });
-
-  const getCategoryCount = (category: string) => {
-    if (category === 'All') return projects.length;
-    return projects.filter((p) => p.category.toLowerCase() === category.toLowerCase()).length;
-  };
 
   return (
     <div className="py-10 px-8 lg:px-12 space-y-8 max-w-7xl mx-auto pb-36">
@@ -64,7 +47,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
             </h1>
           </div>
           <p className="text-xs text-[#E8BDB3]/60 mt-1">
-            Explore and manage your multi-track recordings, stems, and album releases.
+            Organize and play your personal music projects and track collections.
           </p>
         </div>
 
@@ -81,25 +64,10 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
         </div>
       </div>
 
-      {/* Category Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {CATEGORIES.map((cat) => (
-          <Chip
-            key={cat}
-            label={cat}
-            count={getCategoryCount(cat)}
-            active={activeCategory === cat}
-            onClick={() => onCategoryChange(cat)}
-          />
-        ))}
-      </div>
-
       {/* Projects Grid */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#E5E2E1]">
-            {activeCategory === 'All' ? 'All Projects' : `${activeCategory} Projects`}
-          </h2>
+          <h2 className="text-lg font-semibold text-[#E5E2E1]">All Projects</h2>
           <span className="text-xs text-[#E8BDB3]/50">
             {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
           </span>

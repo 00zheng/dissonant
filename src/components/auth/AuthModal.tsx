@@ -99,7 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <p className="text-xs text-[#E8BDB3]/60 mt-1">
             {mode === 'signin'
               ? 'Access your private music projects, folders, and tracks.'
-              : 'Start organizing albums, stems, and audio sessions with secure cloud sync.'}
+              : 'Start organizing your music projects, folders, and songs with secure cloud sync.'}
           </p>
         </div>
 
@@ -190,7 +190,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#E8BDB3]/40" />
                 <input
                   type="text"
-                  placeholder="e.g. Nocturne Producer"
+                  placeholder="e.g. Alex"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="w-full bg-[#1C1B1B] border border-[#282828] focus:border-[#FF3B00] rounded-[4px] pl-9 pr-3 py-2 text-xs text-[#E5E2E1] outline-none transition-colors"

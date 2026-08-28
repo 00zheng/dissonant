@@ -3,7 +3,6 @@ import { Folder, Project } from '../types';
 import { ProjectGrid } from '../components/library/ProjectGrid';
 import { FolderList } from '../components/library/FolderList';
 import { Button } from '../components/ui/Button';
-import { Chip } from '../components/ui/Chip';
 import { Plus, ArrowRight, Folder as FolderIcon, Disc } from 'lucide-react';
 
 interface LibraryViewProps {
@@ -14,8 +13,6 @@ interface LibraryViewProps {
   onFolderSelect: (folder: Folder) => void;
   onViewAllFolders: () => void;
   onViewAllProjects: () => void;
-  activeFilterTab: string;
-  onFilterChange: (filter: string) => void;
   onCreateFolder: () => void;
   onEditFolder: (folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
@@ -25,8 +22,6 @@ interface LibraryViewProps {
   onDeleteProject: (project: Project) => void;
 }
 
-const CATEGORIES = ['All', 'Album', 'EP', 'Single', 'Stems', 'Demo'];
-
 export const LibraryView: React.FC<LibraryViewProps> = ({
   folders,
   projects,
@@ -35,8 +30,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onFolderSelect,
   onViewAllFolders,
   onViewAllProjects,
-  activeFilterTab,
-  onFilterChange,
   onCreateFolder,
   onEditFolder,
   onDeleteFolder,
@@ -45,13 +38,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onMoveProject,
   onDeleteProject,
 }) => {
-  // Filter projects by search query & category tab
+  // Filter projects by search query
   const filteredProjects = projects.filter((project) => {
-    if (activeFilterTab !== 'All' && activeFilterTab !== 'Library') {
-      if (project.category.toLowerCase() !== activeFilterTab.toLowerCase()) {
-        return false;
-      }
-    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -72,11 +60,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   });
 
-  const getCategoryCount = (category: string) => {
-    if (category === 'All') return projects.length;
-    return projects.filter((p) => p.category.toLowerCase() === category.toLowerCase()).length;
-  };
-
   return (
     <div className="py-10 px-8 lg:px-12 space-y-10 max-w-7xl mx-auto pb-36">
       {/* Main Library Header */}
@@ -86,7 +69,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             Library
           </h1>
           <p className="text-xs text-[#E8BDB3]/60 mt-1">
-            Combined overview of your cloud workspace folders, projects, and multi-track audio.
+            Combined overview of your music folders and projects.
           </p>
         </div>
 
@@ -153,19 +136,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <span>View all projects</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
-        </div>
-
-        {/* Quick Category Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {CATEGORIES.map((cat) => (
-            <Chip
-              key={cat}
-              label={cat}
-              count={getCategoryCount(cat)}
-              active={activeFilterTab === cat || (cat === 'All' && activeFilterTab === 'Library')}
-              onClick={() => onFilterChange(cat)}
-            />
-          ))}
         </div>
 
         <ProjectGrid

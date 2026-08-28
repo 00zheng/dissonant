@@ -23,10 +23,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const isCurrentPlayingProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
 
+  const playableTrack = project.tracks?.find(
+    (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+  );
+  const hasPlayableAudio = Boolean(playableTrack);
+
   const handlePlayHero = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (project.tracks.length > 0) {
-      playTrack(project.tracks[0], project);
+    if (playableTrack) {
+      playTrack(playableTrack, project);
     }
   };
 
@@ -50,26 +55,23 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
         />
 
-        {/* Hover Overlay with Play Button */}
-        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center p-4">
-          <button
-            onClick={handlePlayHero}
-            className="w-12 h-12 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-            title="Play Project"
-          >
-            <Play className="w-5 h-5 fill-white ml-0.5" />
-          </button>
-        </div>
+        {/* Hover Overlay with Play Button if real audio exists */}
+        {hasPlayableAudio && (
+          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center p-4">
+            <button
+              onClick={handlePlayHero}
+              className="w-12 h-12 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+              title="Play Project"
+            >
+              <Play className="w-5 h-5 fill-white ml-0.5" />
+            </button>
+          </div>
+        )}
 
         {/* Active Playing indicator */}
         {isCurrentPlayingProject && (
           <div className="absolute bottom-3 right-3 bg-[#FF3B00] w-3 h-3 rounded-full shadow-md" />
         )}
-
-        {/* Category tag on cover top left */}
-        <div className="absolute top-3 left-3 bg-[#0E0E0E]/80 backdrop-blur-xs px-2 py-0.5 rounded-[4px] border border-[#282828] text-[10px] uppercase font-bold text-[#E5E2E1] tracking-wider">
-          {project.category}
-        </div>
 
         {/* Project Context Menu */}
         {(onEditProject || onMoveProject || onDeleteProject) && (

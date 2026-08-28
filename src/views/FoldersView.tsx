@@ -42,7 +42,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({
             </h1>
           </div>
           <p className="text-xs text-[#E8BDB3]/60 mt-1">
-            Organize your projects, sessions, and audio stems into dedicated workspaces.
+            Organize your music projects, playlists, and audio collections.
           </p>
         </div>
 

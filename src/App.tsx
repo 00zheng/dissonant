@@ -80,7 +80,6 @@ export const AppContent: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname));
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
 
   // Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -473,10 +472,10 @@ export const AppContent: React.FC = () => {
                 Dissonant Cloud
               </span>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#E5E2E1] mb-3">
-                Your Private Studio Workspace
+                Your Personal Music Workspace
               </h1>
               <p className="text-sm text-[#E8BDB3]/70 mb-8 leading-relaxed">
-                Sign in to synchronize your folders, multi-track projects, stem versions, and custom audio sessions across devices with isolated Firestore security.
+                Sign in to synchronize your folders, music projects, and audio files across devices with isolated cloud storage.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs mb-10">
@@ -499,7 +498,7 @@ export const AppContent: React.FC = () => {
                 <div className="bg-[#0E0E0E] p-4 rounded-[4px] border border-[#1C1B1B]">
                   <ShieldCheck className="w-5 h-5 text-[#FF3B00] mb-2" />
                   <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">User Isolation</h4>
-                  <p className="text-[11px] text-[#E8BDB3]/50">Every project and stem is secured under your unique UID.</p>
+                  <p className="text-[11px] text-[#E8BDB3]/50">Every project and song is secured under your unique UID.</p>
                 </div>
                 <div className="bg-[#0E0E0E] p-4 rounded-[4px] border border-[#1C1B1B]">
                   <Database className="w-5 h-5 text-[#FF3B00] mb-2" />
@@ -517,7 +516,7 @@ export const AppContent: React.FC = () => {
             <div className="min-h-full flex flex-col items-center justify-center p-12">
               <Loader2 className="w-7 h-7 animate-spin text-[#FF3B00] mb-3" />
               <span className="text-xs font-bold tracking-widest text-[#E8BDB3]/60 uppercase">
-                Loading Your Cloud Studio...
+                Loading Your Music...
               </span>
             </div>
           ) : route.type === 'folder_detail' ? (
@@ -586,8 +585,6 @@ export const AppContent: React.FC = () => {
             <ProjectsView
               projects={projects}
               searchQuery={searchQuery}
-              activeCategory={activeFilter}
-              onCategoryChange={setActiveFilter}
               onProjectSelect={handleProjectSelect}
               onCreateProject={handleOpenCreateProject}
               onEditProject={handleOpenEditProject}
@@ -603,8 +600,6 @@ export const AppContent: React.FC = () => {
               onFolderSelect={handleFolderSelect}
               onViewAllFolders={() => navigate('/folders')}
               onViewAllProjects={() => navigate('/projects')}
-              activeFilterTab={activeFilter}
-              onFilterChange={setActiveFilter}
               onCreateFolder={handleOpenCreateFolder}
               onEditFolder={handleOpenEditFolder}
               onDeleteFolder={handlePromptDeleteFolder}

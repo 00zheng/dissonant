@@ -104,7 +104,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             Project Title
           </label>
           <Input
-            placeholder="e.g. Synthetic After Dark"
+            placeholder="e.g. Album Ideas"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -114,51 +114,32 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
         <div>
           <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-            Artist / Producer
+            Artist / Performer
           </label>
           <Input
-            placeholder="e.g. NOCTURNE LABS"
+            placeholder="e.g. Alex"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
             required
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-              Category
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as ProjectCategory)}
-              className="w-full bg-[#1C1B1B] text-[#E5E2E1] border border-[#282828] rounded-[4px] py-2.5 px-3 text-sm focus:outline-none focus:border-[#FF3B00]"
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
-              Folder
-            </label>
-            <select
-              value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-              className="w-full bg-[#1C1B1B] text-[#E5E2E1] border border-[#282828] rounded-[4px] py-2.5 px-3 text-sm focus:outline-none focus:border-[#FF3B00]"
-            >
-              <option value="">No Folder (Root)</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
+            Folder (Optional)
+          </label>
+          <select
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+            className="w-full bg-[#1C1B1B] text-[#E5E2E1] border border-[#282828] rounded-[4px] py-2.5 px-3 text-sm focus:outline-none focus:border-[#FF3B00]"
+          >
+            <option value="">No Folder (Root)</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -166,7 +147,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             Tags (comma separated)
           </label>
           <Input
-            placeholder="Cyberpunk, Industrial, Stems"
+            placeholder="e.g. Piano, Lo-fi, Acoustic"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
           />

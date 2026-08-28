@@ -60,14 +60,16 @@ export async function processAudioUpload(
   file: File,
   projectArtist: string,
   projectCoverUrl: string,
-  audioUrl?: string,
+  storagePath?: string,
   trackId?: string
 ): Promise<Track> {
   const id = trackId || `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  if (!audioUrl) {
-    // Store file Blob in IndexedDB
+  // Always cache file Blob in IndexedDB for instant local playback
+  try {
     await dbSaveAudioBlob(id, file);
+  } catch (err) {
+    console.warn('[IDB] Failed to cache audio blob locally:', err);
   }
 
   // Extract Audio Metadata
@@ -76,7 +78,8 @@ export async function processAudioUpload(
   // Clean filename for title
   const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
 
-  const finalAudioUrl = audioUrl || URL.createObjectURL(file);
+  // Local object URL for immediate playback in current session
+  const localBlobUrl = URL.createObjectURL(file);
 
   const track: Track = {
     id: id,
@@ -86,10 +89,12 @@ export async function processAudioUpload(
     durationFormatted,
     bpm: 120,
     key: 'C',
-    versionTag: 'v1.0 Raw',
-    stemsCount: 1,
-    audioUrl: finalAudioUrl,
+    versionTag: 'Take 1',
+    audioUrl: localBlobUrl,
+    storagePath: storagePath,
     coverUrl: projectCoverUrl,
+    hasAudio: true,
+    isSample: false,
   };
 
   return track;

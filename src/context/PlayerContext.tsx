@@ -89,13 +89,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     const unsubEnded = playerEngine.onEnded(() => {
-      // Auto-advance to next track in project track order
+      // Auto-advance to next playable track in project track order
       const proj = currentProjectRef.current;
       const track = currentTrackRef.current;
       if (proj && track && proj.tracks) {
-        const idx = proj.tracks.findIndex((t) => t.id === track.id);
-        if (idx !== -1 && idx < proj.tracks.length - 1) {
-          const nextTrack = proj.tracks[idx + 1];
+        const playableTracks = proj.tracks.filter(
+          (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+        );
+        const idx = playableTracks.findIndex((t) => t.id === track.id);
+        if (idx !== -1 && idx < playableTracks.length - 1) {
+          const nextTrack = playableTracks[idx + 1];
           setCurrentTrack(nextTrack);
           setDuration(nextTrack.duration || 0);
           setCurrentTime(0);
@@ -119,6 +122,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const playTrack = useCallback((track: Track, project?: Project) => {
+    // Prevent attempting playback on tracks with only mock metadata
+    if (!track.audioUrl || track.hasAudio === false || track.isSample) {
+      console.warn(`[Player] Track "${track.title}" has no audio file (sample metadata only). Skipping playback.`);
+      return;
+    }
+
     if (currentTrackRef.current?.id === track.id) {
       playerEngine.togglePlay();
       return;
@@ -135,7 +144,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const togglePlay = useCallback(() => {
-    if (!currentTrackRef.current) return;
+    if (!currentTrackRef.current || !currentTrackRef.current.audioUrl || currentTrackRef.current.hasAudio === false) {
+      return;
+    }
     playerEngine.togglePlay();
   }, []);
 
@@ -163,12 +174,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const track = currentTrackRef.current;
     if (!proj || !track || !proj.tracks || proj.tracks.length === 0) return;
 
-    const idx = proj.tracks.findIndex((t) => t.id === track.id);
-    if (idx !== -1 && idx < proj.tracks.length - 1) {
-      const nextTrack = proj.tracks[idx + 1];
+    const playableTracks = proj.tracks.filter(
+      (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+    );
+    if (playableTracks.length === 0) return;
+
+    const idx = playableTracks.findIndex((t) => t.id === track.id);
+    if (idx !== -1 && idx < playableTracks.length - 1) {
+      const nextTrack = playableTracks[idx + 1];
       playTrack(nextTrack, proj);
     } else {
-      playTrack(proj.tracks[0], proj);
+      playTrack(playableTracks[0], proj);
     }
   }, [playTrack]);
 
@@ -183,12 +199,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const idx = proj.tracks.findIndex((t) => t.id === track.id);
+    const playableTracks = proj.tracks.filter(
+      (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+    );
+    if (playableTracks.length === 0) return;
+
+    const idx = playableTracks.findIndex((t) => t.id === track.id);
     if (idx > 0) {
-      const prevTrack = proj.tracks[idx - 1];
+      const prevTrack = playableTracks[idx - 1];
       playTrack(prevTrack, proj);
     } else {
-      playTrack(proj.tracks[proj.tracks.length - 1], proj);
+      playTrack(playableTracks[playableTracks.length - 1], proj);
     }
   }, [playTrack]);
 

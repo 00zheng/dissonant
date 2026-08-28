@@ -49,7 +49,7 @@ export const FolderModal: React.FC<FolderModalProps> = ({
             Folder Name
           </label>
           <Input
-            placeholder="e.g. Mastered 2026, Soundtracks"
+            placeholder="e.g. 2026 Music, Piano, Practice"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -62,7 +62,7 @@ export const FolderModal: React.FC<FolderModalProps> = ({
             Description (Optional)
           </label>
           <Input
-            placeholder="e.g. Active album production & mixing stage"
+            placeholder="e.g. Practice recordings and song sketches"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />

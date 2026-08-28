@@ -84,6 +84,7 @@ export const TrackList: React.FC<TrackListProps> = ({
         </thead>
         <tbody className="divide-y divide-[#282828]/50">
           {tracks.map((track, index) => {
+            const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
             const isSelected = currentTrack?.id === track.id;
             const isTrackPlaying = isSelected && isPlaying;
             const isBeingDragged = draggedIndex === index;
@@ -97,9 +98,14 @@ export const TrackList: React.FC<TrackListProps> = ({
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
-                onClick={() => playTrack(track, project)}
+                onClick={() => {
+                  if (hasRealAudio) {
+                    playTrack(track, project);
+                  }
+                }}
                 className={clsx(
-                  'group hover:bg-[#1C1B1B] transition-colors cursor-pointer text-sm relative',
+                  'group transition-colors text-sm relative',
+                  hasRealAudio ? 'hover:bg-[#1C1B1B] cursor-pointer' : 'cursor-default opacity-85 hover:bg-[#161616]',
                   isSelected && 'bg-[#1C1B1B]',
                   isBeingDragged && 'opacity-40 bg-[#2A2A2A]',
                   isTargetDrop && 'border-t-2 border-t-[#FF3B00]'
@@ -113,29 +119,34 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {/* Index / Play Button Cell */}
                 <td className="py-3 px-3 text-center text-xs text-[#E8BDB3]/50 group-hover:text-white">
                   <div className="relative flex items-center justify-center h-6 w-6 mx-auto">
-                    {isTrackPlaying ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePlay();
-                        }}
-                        className="text-[#FF3B00] hover:scale-110 transition-transform cursor-pointer"
-                      >
-                        <Pause className="w-4 h-4 fill-[#FF3B00]" />
-                      </button>
-                    ) : (
-                      <>
-                        <span className="group-hover:hidden font-mono text-xs">{index + 1}</span>
+                    {hasRealAudio ? (
+                      isTrackPlaying ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            playTrack(track, project);
+                            togglePlay();
                           }}
-                          className="hidden group-hover:block text-[#E5E2E1] hover:text-[#FF3B00] transition-colors cursor-pointer"
+                          className="text-[#FF3B00] hover:scale-110 transition-transform cursor-pointer"
                         >
-                          <Play className="w-4 h-4 fill-current ml-0.5" />
+                          <Pause className="w-4 h-4 fill-[#FF3B00]" />
                         </button>
-                      </>
+                      ) : (
+                        <>
+                          <span className="group-hover:hidden font-mono text-xs">{index + 1}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playTrack(track, project);
+                            }}
+                            className="hidden group-hover:block text-[#E5E2E1] hover:text-[#FF3B00] transition-colors cursor-pointer"
+                            title="Play Track"
+                          >
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </button>
+                        </>
+                      )
+                    ) : (
+                      <span className="font-mono text-xs text-[#E8BDB3]/40">{index + 1}</span>
                     )}
                   </div>
                 </td>
@@ -147,13 +158,18 @@ export const TrackList: React.FC<TrackListProps> = ({
                       <img src={track.coverUrl || project?.coverUrl} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <p className={clsx('font-medium text-[#E5E2E1] group-hover:text-white', isSelected && 'text-[#FF3B00]')}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={clsx('font-medium text-[#E5E2E1]', hasRealAudio && 'group-hover:text-white', isSelected && 'text-[#FF3B00]')}>
                           {track.title}
                         </p>
                         {track.versionTag && (
                           <span className="px-1.5 py-0.2 bg-[#0E0E0E] border border-[#282828] text-[10px] text-[#E8BDB3]/60 rounded-[3px]">
                             {track.versionTag}
+                          </span>
+                        )}
+                        {!hasRealAudio && (
+                          <span className="px-1.5 py-0.2 bg-[#1C1B1B] border border-[#282828] text-[10px] text-[#E8BDB3]/40 rounded-[3px]">
+                            Sample Metadata
                           </span>
                         )}
                       </div>
@@ -179,7 +195,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {/* Row Actions */}
                 <td className="py-3 px-4 text-right relative">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {track.audioUrl && (
+                    {hasRealAudio && (
                       <a
                         href={track.audioUrl}
                         download={`${track.title}.mp3`}

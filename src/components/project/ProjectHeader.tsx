@@ -23,12 +23,27 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
 
+  const playableTrack = project.tracks?.find(
+    (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+  );
+  const hasPlayableAudio = Boolean(playableTrack);
+
   const handleMainPlay = () => {
     if (isPlayingThisProject) {
       togglePlay();
-    } else if (project.tracks && project.tracks.length > 0) {
-      playTrack(project.tracks[0], project);
+    } else if (playableTrack) {
+      playTrack(playableTrack, project);
     }
+  };
+
+  const handleShuffle = () => {
+    if (!hasPlayableAudio) return;
+    const playableTracks = (project.tracks || []).filter(
+      (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+    );
+    if (playableTracks.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * playableTracks.length);
+    playTrack(playableTracks[randomIndex], project);
   };
 
   return (
@@ -87,7 +102,9 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               variant="accent"
               size="md"
               onClick={handleMainPlay}
-              className="gap-2"
+              disabled={!hasPlayableAudio && !isPlayingThisProject}
+              className={`gap-2 ${!hasPlayableAudio && !isPlayingThisProject ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={hasPlayableAudio ? 'Play Project' : 'No audio files uploaded in this project'}
             >
               {isPlayingThisProject ? (
                 <>
@@ -102,7 +119,14 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               )}
             </Button>
 
-            <Button variant="secondary" size="md" className="gap-2">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleShuffle}
+              disabled={!hasPlayableAudio}
+              className={`gap-2 ${!hasPlayableAudio ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={hasPlayableAudio ? 'Shuffle Play' : 'No audio files uploaded'}
+            >
               <Shuffle className="w-4 h-4" />
               <span>Shuffle</span>
             </Button>

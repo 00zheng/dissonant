@@ -25,210 +25,200 @@ const createSvgCover = (title: string, bg1: string, bg2: string, accent: string)
 export const MOCK_FOLDERS: Folder[] = [
   {
     id: 'folder-1',
-    name: 'Work In Progress',
-    itemCount: 4,
-    description: 'Active album production & mixing stages',
+    name: '2026 Music',
+    itemCount: 2,
+    description: 'Current songs and track ideas for this year',
     updatedAt: '2 HOURS AGO'
   },
   {
     id: 'folder-2',
-    name: 'Mastered 2026',
-    itemCount: 2,
-    description: 'Final masters ready for distribution',
+    name: 'Piano',
+    itemCount: 1,
+    description: 'Piano recordings and practice sessions',
     updatedAt: 'YESTERDAY'
   },
   {
     id: 'folder-3',
-    name: 'Stem Archives',
-    itemCount: 3,
-    description: 'Raw multi-track stems & acoustic captures',
+    name: 'Practice',
+    itemCount: 1,
+    description: 'Exercises, warm-ups, and acoustic jam takes',
     updatedAt: 'AUG 21'
   },
   {
     id: 'folder-4',
-    name: 'Live Demos & Skits',
-    itemCount: 5,
-    description: 'Field recordings, synth jams & sketches',
+    name: 'Ideas',
+    itemCount: 1,
+    description: 'Voice memos, chords, and rough sketches',
     updatedAt: 'AUG 15'
   }
 ];
 
-// Sample public domain royalty free audio file for real playback test
-const SAMPLE_AUDIO_1 = 'https://cdn.freesound.org/previews/682/682087_11861866-lq.mp3';
-const SAMPLE_AUDIO_2 = 'https://cdn.freesound.org/previews/612/612610_11861866-lq.mp3';
-const SAMPLE_AUDIO_3 = 'https://cdn.freesound.org/previews/567/567015_11861866-lq.mp3';
-
 export const MOCK_PROJECTS: Project[] = [
   {
     id: 'proj-1',
-    title: 'Synthetic After Dark',
-    artist: 'NOCTURNE LABS',
-    coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00'),
+    title: 'Album Ideas',
+    artist: 'Alex',
+    coverUrl: createSvgCover('Album Ideas', '#0E0E0E', '#1C1B1B', '#FF3B00'),
     category: 'Album',
     folderId: 'folder-1',
     releaseDate: '2026-08-20',
-    tracksCount: 8,
-    totalDuration: '32m 45s',
-    tags: ['Cyberpunk', 'Industrial', 'Analogue'],
+    tracksCount: 4,
+    totalDuration: '15m 26s',
+    tags: ['Indie', 'Acoustic', 'Sketches'],
     tracks: [
       {
         id: 't-101',
-        title: 'Neon Monochrome (Intro)',
-        artist: 'NOCTURNE LABS',
+        title: 'Morning Light',
+        artist: 'Alex',
         duration: 142,
         durationFormatted: '02:22',
         bpm: 124,
         key: 'Fm',
-        versionTag: 'v3.1 Master',
-        stemsCount: 8,
-        audioUrl: SAMPLE_AUDIO_1,
-        coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00')
+        versionTag: 'Take 2',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Album Ideas', '#0E0E0E', '#1C1B1B', '#FF3B00')
       },
       {
         id: 't-102',
-        title: 'Dissonant Transmissions',
-        artist: 'NOCTURNE LABS feat. KAI',
+        title: 'Dissonant Chords',
+        artist: 'Alex',
         duration: 254,
         durationFormatted: '04:14',
         bpm: 128,
         key: 'Am',
-        versionTag: 'v2.4 Final',
-        stemsCount: 16,
-        audioUrl: SAMPLE_AUDIO_2,
-        coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00')
+        versionTag: 'Mix 1',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Album Ideas', '#0E0E0E', '#1C1B1B', '#FF3B00')
       },
       {
         id: 't-103',
-        title: 'Sub-Zero Resonance',
-        artist: 'NOCTURNE LABS',
+        title: 'Late Night Walk',
+        artist: 'Alex',
         duration: 218,
         durationFormatted: '03:38',
         bpm: 130,
         key: 'Dm',
-        versionTag: 'Stem Mix',
-        stemsCount: 12,
-        audioUrl: SAMPLE_AUDIO_3,
-        coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00')
+        versionTag: 'Acoustic',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Album Ideas', '#0E0E0E', '#1C1B1B', '#FF3B00')
       },
       {
         id: 't-104',
-        title: 'Analog Signal Decay',
-        artist: 'NOCTURNE LABS',
+        title: 'Signal Drift',
+        artist: 'Alex',
         duration: 312,
         durationFormatted: '05:12',
         bpm: 120,
         key: 'Em',
-        versionTag: 'v1.8 Draft',
-        stemsCount: 6,
-        audioUrl: SAMPLE_AUDIO_1,
-        coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00')
-      },
-      {
-        id: 't-105',
-        title: 'Modular Overdrive',
-        artist: 'NOCTURNE LABS',
-        duration: 275,
-        durationFormatted: '04:35',
-        bpm: 132,
-        key: 'G#m',
-        versionTag: 'v2.0 Mix',
-        stemsCount: 14,
-        audioUrl: SAMPLE_AUDIO_2,
-        coverUrl: createSvgCover('Synthetic After Dark', '#0E0E0E', '#1C1B1B', '#FF3B00')
+        versionTag: 'Rough Draft',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Album Ideas', '#0E0E0E', '#1C1B1B', '#FF3B00')
       }
     ]
   },
   {
     id: 'proj-2',
-    title: 'Echo Chamber EP',
-    artist: 'DISSONANT AUDIO',
-    coverUrl: createSvgCover('Echo Chamber', '#131313', '#201F1F', '#E5E2E1'),
-    category: 'EP',
+    title: 'Beats',
+    artist: 'Alex',
+    coverUrl: createSvgCover('Beats', '#131313', '#201F1F', '#E5E2E1'),
+    category: 'Album',
     folderId: 'folder-1',
     releaseDate: '2026-08-14',
-    tracksCount: 4,
-    totalDuration: '18m 10s',
-    tags: ['Ambient', 'Minimal', 'Dub'],
+    tracksCount: 2,
+    totalDuration: '10m 00s',
+    tags: ['Lo-fi', 'Beats', 'Chill'],
     tracks: [
       {
         id: 't-201',
-        title: 'Reverb Reflections',
-        artist: 'DISSONANT AUDIO',
+        title: 'Midnight Coffee',
+        artist: 'Alex',
         duration: 280,
         durationFormatted: '04:40',
         bpm: 110,
         key: 'Cm',
-        versionTag: 'Final Master',
-        stemsCount: 10,
-        audioUrl: SAMPLE_AUDIO_1,
-        coverUrl: createSvgCover('Echo Chamber', '#131313', '#201F1F', '#E5E2E1')
+        versionTag: 'Mix 2',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Beats', '#131313', '#201F1F', '#E5E2E1')
       },
       {
         id: 't-202',
-        title: 'Feedback Loop 09',
-        artist: 'DISSONANT AUDIO',
+        title: 'Rainy Window',
+        artist: 'Alex',
         duration: 320,
         durationFormatted: '05:20',
         bpm: 115,
         key: 'Gm',
-        versionTag: 'v1.2',
-        stemsCount: 8,
-        audioUrl: SAMPLE_AUDIO_2,
-        coverUrl: createSvgCover('Echo Chamber', '#131313', '#201F1F', '#E5E2E1')
+        versionTag: 'Demo',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Beats', '#131313', '#201F1F', '#E5E2E1')
       }
     ]
   },
   {
     id: 'proj-3',
-    title: 'Hyperdrive Stems Vol 1',
-    artist: 'KINETIC SOUNDS',
-    coverUrl: createSvgCover('Hyperdrive', '#1F0B05', '#351107', '#FF562D'),
-    category: 'Stems',
-    folderId: 'folder-3',
+    title: 'Unfinished Songs',
+    artist: 'Alex',
+    coverUrl: createSvgCover('Unfinished Songs', '#1F0B05', '#351107', '#FF562D'),
+    category: 'Album',
+    folderId: 'folder-4',
     releaseDate: '2026-08-01',
-    tracksCount: 12,
-    totalDuration: '45m 00s',
-    tags: ['Raw Stems', 'Drums', 'Synths'],
+    tracksCount: 1,
+    totalDuration: '03m 15s',
+    tags: ['Demos', 'Vocal', 'Drafts'],
     tracks: [
       {
         id: 't-301',
-        title: 'Kick & Bass Sub-System',
-        artist: 'KINETIC SOUNDS',
+        title: 'Echoes of You',
+        artist: 'Alex',
         duration: 195,
         durationFormatted: '03:15',
         bpm: 140,
         key: 'F#m',
-        versionTag: 'Stem Solo',
-        stemsCount: 4,
-        audioUrl: SAMPLE_AUDIO_3,
-        coverUrl: createSvgCover('Hyperdrive', '#1F0B05', '#351107', '#FF562D')
+        versionTag: 'Take 1',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Unfinished Songs', '#1F0B05', '#351107', '#FF562D')
       }
     ]
   },
   {
     id: 'proj-4',
-    title: 'Nocturne Sessions',
-    artist: 'GHOST COLLECTIVE',
-    coverUrl: createSvgCover('Nocturne Sessions', '#090E17', '#1A2332', '#00F0FF'),
-    category: 'Single',
+    title: 'Piano Practice',
+    artist: 'Alex',
+    coverUrl: createSvgCover('Piano Practice', '#090E17', '#1A2332', '#00F0FF'),
+    category: 'Album',
     folderId: 'folder-2',
     releaseDate: '2026-07-28',
-    tracksCount: 2,
-    totalDuration: '09m 15s',
-    tags: ['Live', 'Experimental'],
+    tracksCount: 1,
+    totalDuration: '04m 55s',
+    tags: ['Piano', 'Classical', 'Solo'],
     tracks: [
       {
         id: 't-401',
-        title: 'Late Night Tape Loop',
-        artist: 'GHOST COLLECTIVE',
+        title: 'Nocturne in C Minor',
+        artist: 'Alex',
         duration: 295,
         durationFormatted: '04:55',
         bpm: 98,
         key: 'Bm',
-        versionTag: 'Direct Tape',
-        stemsCount: 2,
-        audioUrl: SAMPLE_AUDIO_1,
-        coverUrl: createSvgCover('Nocturne Sessions', '#090E17', '#1A2332', '#00F0FF')
+        versionTag: 'Practice Take',
+        audioUrl: '',
+        hasAudio: false,
+        isSample: true,
+        coverUrl: createSvgCover('Piano Practice', '#090E17', '#1A2332', '#00F0FF')
       }
     ]
   }

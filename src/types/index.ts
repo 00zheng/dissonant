@@ -8,10 +8,13 @@ export interface Track {
   durationFormatted: string; // e.g. "03:42"
   bpm: number;
   key: string;
-  versionTag: string; // e.g. "v2.4 Final", "Stem Mix", "Draft"
+  versionTag: string; // e.g. "Take 1", "Draft"
   stemsCount?: number;
   audioUrl: string;
+  storagePath?: string;
   coverUrl: string;
+  hasAudio?: boolean; // true if backed by real Firebase Storage file or local IndexedDB Blob
+  isSample?: boolean; // true if mock metadata only
 }
 
 export type ProjectCategory = 'Album' | 'EP' | 'Single' | 'Stems' | 'Demo';
