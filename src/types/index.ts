@@ -1,5 +1,7 @@
 export interface Track {
   id: string;
+  projectId?: string;
+  order?: number;
   title: string;
   artist: string;
   duration: number; // in seconds

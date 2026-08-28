@@ -59,12 +59,16 @@ export function extractAudioMetadata(file: File): Promise<{ duration: number; du
 export async function processAudioUpload(
   file: File,
   projectArtist: string,
-  projectCoverUrl: string
+  projectCoverUrl: string,
+  audioUrl?: string,
+  trackId?: string
 ): Promise<Track> {
-  const trackId = `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const id = trackId || `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  // Store file Blob in IndexedDB
-  await dbSaveAudioBlob(trackId, file);
+  if (!audioUrl) {
+    // Store file Blob in IndexedDB
+    await dbSaveAudioBlob(id, file);
+  }
 
   // Extract Audio Metadata
   const { duration, durationFormatted } = await extractAudioMetadata(file);
@@ -72,10 +76,10 @@ export async function processAudioUpload(
   // Clean filename for title
   const cleanTitle = file.name.replace(/\.[^/.]+$/, '');
 
-  const objectUrl = URL.createObjectURL(file);
+  const finalAudioUrl = audioUrl || URL.createObjectURL(file);
 
   const track: Track = {
-    id: trackId,
+    id: id,
     title: cleanTitle,
     artist: projectArtist || 'Unknown Artist',
     duration: Math.round(duration),
@@ -84,7 +88,7 @@ export async function processAudioUpload(
     key: 'C',
     versionTag: 'v1.0 Raw',
     stemsCount: 1,
-    audioUrl: objectUrl,
+    audioUrl: finalAudioUrl,
     coverUrl: projectCoverUrl,
   };
 

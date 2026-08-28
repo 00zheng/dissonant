@@ -1,26 +1,41 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  writeBatch,
+  serverTimestamp,
+  query,
+  orderBy,
+  where
+} from 'firebase/firestore';
+import { ref, getDownloadURL, deleteObject, uploadBytesResumable, UploadTask } from 'firebase/storage';
+import { db, storage } from './firebase';
 import { Folder, Project, Track } from '../types';
 import { MOCK_FOLDERS, MOCK_PROJECTS } from '../data/mockData';
 
-const DB_NAME = 'dissonant_db';
-const DB_VERSION = 2;
+// --- Local IndexedDB for Binary Audio File Blobs & Offline Fallback ---
+const IDB_NAME = 'dissonant_db';
+const IDB_VERSION = 2;
 const STORE_FOLDERS = 'folders';
 const STORE_PROJECTS = 'projects';
 const STORE_AUDIO = 'audio_files';
 
-function openDB(): Promise<IDBDatabase> {
+function openIDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
 
     request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_FOLDERS)) {
-        db.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
+      const dbInstance = (event.target as IDBOpenDBRequest).result;
+      if (!dbInstance.objectStoreNames.contains(STORE_FOLDERS)) {
+        dbInstance.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
       }
-      if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
-        db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+      if (!dbInstance.objectStoreNames.contains(STORE_PROJECTS)) {
+        dbInstance.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
       }
-      if (!db.objectStoreNames.contains(STORE_AUDIO)) {
-        db.createObjectStore(STORE_AUDIO);
+      if (!dbInstance.objectStoreNames.contains(STORE_AUDIO)) {
+        dbInstance.createObjectStore(STORE_AUDIO);
       }
     };
 
@@ -29,161 +44,11 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function initDB(): Promise<{ folders: Folder[]; projects: Project[] }> {
-  const db = await openDB();
-
-  // Check if initial seeding is needed
-  const folderCount = await getStoreCount(db, STORE_FOLDERS);
-  const projectCount = await getStoreCount(db, STORE_PROJECTS);
-
-  if (folderCount === 0) {
-    await populateStore(db, STORE_FOLDERS, MOCK_FOLDERS);
-  }
-  if (projectCount === 0) {
-    await populateStore(db, STORE_PROJECTS, MOCK_PROJECTS);
-  }
-
-  const folders = await getAllItems<Folder>(db, STORE_FOLDERS);
-  const projects = await getAllItems<Project>(db, STORE_PROJECTS);
-
-  // Resolve dynamic object URLs for tracks stored in IndexedDB
-  for (const project of projects) {
-    if (project.tracks) {
-      for (const track of project.tracks) {
-        track.audioUrl = await dbResolveTrackAudioUrl(track);
-      }
-    }
-  }
-
-  return { folders, projects };
-}
-
-function getStoreCount(db: IDBDatabase, storeName: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const store = tx.objectStore(storeName);
-    const request = store.count();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function populateStore<T>(db: IDBDatabase, storeName: string, items: T[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-    items.forEach((item) => store.put(item));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-function getAllItems<T>(db: IDBDatabase, storeName: string): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const store = tx.objectStore(storeName);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result as T[]);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function dbSaveFolder(folder: Folder): Promise<Folder> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_FOLDERS, 'readwrite');
-    const store = tx.objectStore(STORE_FOLDERS);
-    const request = store.put(folder);
-    request.onsuccess = () => resolve(folder);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function dbDeleteFolder(folderId: string): Promise<void> {
-  const db = await openDB();
-  
-  // Also update any projects in this folder to have no folderId
-  const projects = await getAllItems<Project>(db, STORE_PROJECTS);
-  const tx = db.transaction([STORE_FOLDERS, STORE_PROJECTS], 'readwrite');
-  
-  const folderStore = tx.objectStore(STORE_FOLDERS);
-  folderStore.delete(folderId);
-
-  const projectStore = tx.objectStore(STORE_PROJECTS);
-  projects.forEach((proj) => {
-    if (proj.folderId === folderId) {
-      const updated = { ...proj, folderId: undefined };
-      projectStore.put(updated);
-    }
-  });
-
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function dbSaveProject(project: Project): Promise<Project> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_PROJECTS, 'readwrite');
-    const store = tx.objectStore(STORE_PROJECTS);
-    const request = store.put(project);
-    request.onsuccess = () => resolve(project);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function dbDeleteProject(projectId: string): Promise<void> {
-  const db = await openDB();
-  
-  // Delete project and associated track audio blobs
-  const projects = await getAllItems<Project>(db, STORE_PROJECTS);
-  const project = projects.find((p) => p.id === projectId);
-  
-  if (project && project.tracks) {
-    for (const track of project.tracks) {
-      await dbDeleteAudioBlob(track.id);
-    }
-  }
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_PROJECTS, 'readwrite');
-    const store = tx.objectStore(STORE_PROJECTS);
-    const request = store.delete(projectId);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function dbMoveProject(projectId: string, folderId?: string): Promise<Project> {
-  const db = await openDB();
-  const tx = db.transaction(STORE_PROJECTS, 'readwrite');
-  const store = tx.objectStore(STORE_PROJECTS);
-
-  const project: Project = await new Promise((resolve, reject) => {
-    const getReq = store.get(projectId);
-    getReq.onsuccess = () => resolve(getReq.result);
-    getReq.onerror = () => reject(getReq.error);
-  });
-
-  if (!project) throw new Error('Project not found');
-
-  const updatedProject = { ...project, folderId: folderId || undefined };
-
-  return new Promise((resolve, reject) => {
-    const putReq = store.put(updatedProject);
-    putReq.onsuccess = () => resolve(updatedProject);
-    putReq.onerror = () => reject(putReq.error);
-  });
-}
-
-// --- Binary Audio File Blob Storage ---
-
+// Audio Blob operations in IndexedDB
 export async function dbSaveAudioBlob(trackId: string, blob: Blob): Promise<void> {
-  const db = await openDB();
+  const idb = await openIDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_AUDIO, 'readwrite');
+    const tx = idb.transaction(STORE_AUDIO, 'readwrite');
     const store = tx.objectStore(STORE_AUDIO);
     const request = store.put(blob, trackId);
     request.onsuccess = () => resolve();
@@ -192,9 +57,9 @@ export async function dbSaveAudioBlob(trackId: string, blob: Blob): Promise<void
 }
 
 export async function dbGetAudioBlob(trackId: string): Promise<Blob | null> {
-  const db = await openDB();
+  const idb = await openIDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_AUDIO, 'readonly');
+    const tx = idb.transaction(STORE_AUDIO, 'readonly');
     const store = tx.objectStore(STORE_AUDIO);
     const request = store.get(trackId);
     request.onsuccess = () => resolve(request.result || null);
@@ -203,9 +68,9 @@ export async function dbGetAudioBlob(trackId: string): Promise<Blob | null> {
 }
 
 export async function dbDeleteAudioBlob(trackId: string): Promise<void> {
-  const db = await openDB();
+  const idb = await openIDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_AUDIO, 'readwrite');
+    const tx = idb.transaction(STORE_AUDIO, 'readwrite');
     const store = tx.objectStore(STORE_AUDIO);
     const request = store.delete(trackId);
     request.onsuccess = () => resolve();
@@ -214,9 +79,397 @@ export async function dbDeleteAudioBlob(trackId: string): Promise<void> {
 }
 
 export async function dbResolveTrackAudioUrl(track: Track): Promise<string> {
+  // If we already have an HTTP/HTTPS URL or GS URL, resolve via Cloud Storage
+  if (track.audioUrl && (track.audioUrl.startsWith('http') || track.audioUrl.startsWith('gs://') || track.audioUrl.startsWith('users/'))) {
+    try {
+      // If it's a full URL or a storage path, we can get a download URL
+      // (Assuming track.audioUrl stores the path like users/{userId}/tracks/{trackId}/file.wav)
+      let storagePath = track.audioUrl;
+      // Extract path if it's a gs:// URL
+      if (storagePath.startsWith('gs://')) {
+        const url = new URL(storagePath);
+        storagePath = url.pathname.slice(1); // remove leading slash
+      }
+      
+      const fileRef = ref(storage, storagePath);
+      return await getDownloadURL(fileRef);
+    } catch (err) {
+      console.warn(`[Storage] Failed to resolve download URL for ${track.id}:`, err);
+      // Fallback to local IndexedDB if resolution fails, just in case
+    }
+  }
+
+  // Fallback to local IndexedDB
   const blob = await dbGetAudioBlob(track.id);
   if (blob) {
     return URL.createObjectURL(blob);
   }
   return track.audioUrl;
+}
+
+// Get local IndexedDB folders and projects (used for migration)
+async function getLocalData(): Promise<{ folders: Folder[]; projects: Project[] }> {
+  try {
+    const idb = await openIDB();
+    const foldersTx = idb.transaction(STORE_FOLDERS, 'readonly');
+    const foldersStore = foldersTx.objectStore(STORE_FOLDERS);
+    const folders = await new Promise<Folder[]>((res, rej) => {
+      const req = foldersStore.getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => rej(req.error);
+    });
+
+    const projectsTx = idb.transaction(STORE_PROJECTS, 'readonly');
+    const projectsStore = projectsTx.objectStore(STORE_PROJECTS);
+    const projects = await new Promise<Project[]>((res, rej) => {
+      const req = projectsStore.getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => rej(req.error);
+    });
+
+    return {
+      folders: folders.length > 0 ? folders : MOCK_FOLDERS,
+      projects: projects.length > 0 ? projects : MOCK_PROJECTS,
+    };
+  } catch {
+    return { folders: MOCK_FOLDERS, projects: MOCK_PROJECTS };
+  }
+}
+
+// --- Firestore User Data Operations (/users/{userId}/...) ---
+
+export async function initUserData(userId: string): Promise<{ folders: Folder[]; projects: Project[] }> {
+  const foldersCol = collection(db, 'users', userId, 'folders');
+  const projectsCol = collection(db, 'users', userId, 'projects');
+  const tracksCol = collection(db, 'users', userId, 'tracks');
+
+  const [foldersSnap, projectsSnap] = await Promise.all([
+    getDocs(foldersCol),
+    getDocs(projectsCol),
+  ]);
+
+  // If user has no existing Firestore data, migrate from local IndexedDB / initial mock data
+  if (foldersSnap.empty && projectsSnap.empty) {
+    console.log(`[Firestore] Initializing and migrating metadata to Firestore for user: ${userId}`);
+    const localData = await getLocalData();
+    await migrateLocalDataToFirestore(userId, localData.folders, localData.projects);
+    return initUserData(userId); // Re-fetch freshly migrated data
+  }
+
+  // Load Folders
+  const folders: Folder[] = foldersSnap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      name: data.name || '',
+      description: data.description || '',
+      itemCount: data.itemCount || 0,
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toLocaleDateString() : 'JUST NOW',
+    };
+  });
+
+  // Load Tracks
+  const tracksSnap = await getDocs(tracksCol);
+  const tracksMap = new Map<string, Track[]>();
+
+  for (const trackDoc of tracksSnap.docs) {
+    const data = trackDoc.data();
+    const track: Track = {
+      id: trackDoc.id,
+      projectId: data.projectId,
+      order: data.order ?? 0,
+      title: data.title || 'Untitled Track',
+      artist: data.artist || 'Unknown Artist',
+      duration: data.duration || 0,
+      durationFormatted: data.durationFormatted || '00:00',
+      bpm: data.bpm || 120,
+      key: data.key || 'C',
+      versionTag: data.versionTag || 'Draft',
+      stemsCount: data.stemsCount,
+      audioUrl: data.audioUrl || '',
+      coverUrl: data.coverUrl || '',
+    };
+
+    // Check if local binary audio blob exists in IndexedDB
+    track.audioUrl = await dbResolveTrackAudioUrl(track);
+
+    const projectTracks = tracksMap.get(track.projectId!) || [];
+    projectTracks.push(track);
+    tracksMap.set(track.projectId!, projectTracks);
+  }
+
+  // Sort tracks by order ASC for each project
+  tracksMap.forEach((tracks) => {
+    tracks.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  });
+
+  // Load Projects
+  const projects: Project[] = projectsSnap.docs.map((d) => {
+    const data = d.data();
+    const projTracks = tracksMap.get(d.id) || [];
+    return {
+      id: d.id,
+      title: data.title || '',
+      artist: data.artist || '',
+      coverUrl: data.coverUrl || '',
+      category: data.category || 'Album',
+      folderId: data.folderId || undefined,
+      releaseDate: data.releaseDate || '',
+      tracksCount: projTracks.length || data.tracksCount || 0,
+      totalDuration: data.totalDuration || '00m 00s',
+      tags: data.tags || [],
+      tracks: projTracks,
+    };
+  });
+
+  return { folders, projects };
+}
+
+// Migrate local IndexedDB metadata into Firestore
+async function migrateLocalDataToFirestore(
+  userId: string,
+  folders: Folder[],
+  projects: Project[]
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  // Save Folders
+  for (const folder of folders) {
+    const folderRef = doc(db, 'users', userId, 'folders', folder.id);
+    batch.set(folderRef, {
+      id: folder.id,
+      name: folder.name,
+      description: folder.description || '',
+      itemCount: folder.itemCount || 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  // Save Projects and extracted Tracks
+  for (const project of projects) {
+    const projectRef = doc(db, 'users', userId, 'projects', project.id);
+    batch.set(projectRef, {
+      id: project.id,
+      title: project.title,
+      artist: project.artist,
+      coverUrl: project.coverUrl,
+      category: project.category,
+      folderId: project.folderId || null,
+      releaseDate: project.releaseDate || '',
+      tags: project.tags || [],
+      tracksCount: project.tracks?.length || project.tracksCount || 0,
+      totalDuration: project.totalDuration || '00m 00s',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    if (project.tracks && project.tracks.length > 0) {
+      project.tracks.forEach((track, index) => {
+        const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+        batch.set(trackRef, {
+          id: track.id,
+          projectId: project.id,
+          order: index,
+          title: track.title,
+          artist: track.artist,
+          duration: track.duration,
+          durationFormatted: track.durationFormatted,
+          bpm: track.bpm,
+          key: track.key,
+          versionTag: track.versionTag,
+          stemsCount: track.stemsCount || null,
+          audioUrl: track.audioUrl,
+          coverUrl: track.coverUrl,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      });
+    }
+  }
+
+  await batch.commit();
+  console.log(`[Firestore] Migration complete for user: ${userId}`);
+}
+
+// Folder Firestore Operations
+export async function fsSaveFolder(userId: string, folder: Folder): Promise<Folder> {
+  const folderRef = doc(db, 'users', userId, 'folders', folder.id);
+  await setDoc(
+    folderRef,
+    {
+      id: folder.id,
+      name: folder.name,
+      description: folder.description || '',
+      itemCount: folder.itemCount || 0,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  return folder;
+}
+
+export async function fsDeleteFolder(userId: string, folderId: string): Promise<void> {
+  const folderRef = doc(db, 'users', userId, 'folders', folderId);
+  await deleteDoc(folderRef);
+
+  // Update projects in this folder to have no folderId
+  const projectsCol = collection(db, 'users', userId, 'projects');
+  const q = query(projectsCol, where('folderId', '==', folderId));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach((d) => {
+    batch.update(d.ref, { folderId: null, updatedAt: serverTimestamp() });
+  });
+  await batch.commit();
+}
+
+// Project Firestore Operations
+export async function fsSaveProject(userId: string, project: Project): Promise<Project> {
+  const projectRef = doc(db, 'users', userId, 'projects', project.id);
+  await setDoc(
+    projectRef,
+    {
+      id: project.id,
+      title: project.title,
+      artist: project.artist,
+      coverUrl: project.coverUrl,
+      category: project.category,
+      folderId: project.folderId || null,
+      releaseDate: project.releaseDate || '',
+      tags: project.tags || [],
+      tracksCount: project.tracks?.length || project.tracksCount || 0,
+      totalDuration: project.totalDuration || '00m 00s',
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  // Save tracks if present
+  if (project.tracks && project.tracks.length > 0) {
+    const batch = writeBatch(db);
+    project.tracks.forEach((track, index) => {
+      const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+      batch.set(
+        trackRef,
+        {
+          id: track.id,
+          projectId: project.id,
+          order: track.order ?? index,
+          title: track.title,
+          artist: track.artist,
+          duration: track.duration,
+          durationFormatted: track.durationFormatted,
+          bpm: track.bpm,
+          key: track.key,
+          versionTag: track.versionTag,
+          stemsCount: track.stemsCount || null,
+          audioUrl: track.audioUrl,
+          coverUrl: track.coverUrl,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+    await batch.commit();
+  }
+
+  return project;
+}
+
+export async function fsDeleteProject(userId: string, projectId: string): Promise<void> {
+  const projectRef = doc(db, 'users', userId, 'projects', projectId);
+  await deleteDoc(projectRef);
+
+  // Find all tracks belonging to this project
+  const tracksCol = collection(db, 'users', userId, 'tracks');
+  const q = query(tracksCol, where('projectId', '==', projectId));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+
+  for (const trackDoc of snap.docs) {
+    batch.delete(trackDoc.ref);
+    // Delete local IndexedDB audio blob
+    await dbDeleteAudioBlob(trackDoc.id);
+  }
+  await batch.commit();
+}
+
+export async function fsMoveProject(userId: string, projectId: string, folderId?: string): Promise<void> {
+  const projectRef = doc(db, 'users', userId, 'projects', projectId);
+  await setDoc(
+    projectRef,
+    {
+      folderId: folderId || null,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+// Track Firestore Operations
+export async function fsSaveTrack(userId: string, projectId: string, track: Track, order: number): Promise<void> {
+  const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+  await setDoc(
+    trackRef,
+    {
+      id: track.id,
+      projectId,
+      order,
+      title: track.title,
+      artist: track.artist,
+      duration: track.duration,
+      durationFormatted: track.durationFormatted,
+      bpm: track.bpm,
+      key: track.key,
+      versionTag: track.versionTag,
+      stemsCount: track.stemsCount || null,
+      audioUrl: track.audioUrl,
+      coverUrl: track.coverUrl,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function fsDeleteTrack(userId: string, trackId: string, audioUrl?: string): Promise<void> {
+  const trackRef = doc(db, 'users', userId, 'tracks', trackId);
+  await deleteDoc(trackRef);
+  
+  if (audioUrl && (audioUrl.startsWith('http') || audioUrl.startsWith('gs://') || audioUrl.startsWith('users/'))) {
+    try {
+      let storagePath = audioUrl;
+      if (storagePath.startsWith('gs://')) {
+        const url = new URL(storagePath);
+        storagePath = url.pathname.slice(1);
+      }
+      
+      if (!storagePath.startsWith('http')) {
+         const fileRef = ref(storage, storagePath);
+         await deleteObject(fileRef);
+      }
+    } catch (err) {
+      console.warn(`[Storage] Failed to delete audio file for ${trackId}:`, err);
+    }
+  }
+
+  await dbDeleteAudioBlob(trackId);
+}
+
+export function fsUploadAudioFile(userId: string, trackId: string, file: File): { task: UploadTask, storagePath: string } {
+  const fileExt = file.name.split('.').pop() || 'wav';
+  const fileName = `${trackId}.${fileExt}`;
+  const storagePath = `users/${userId}/tracks/${trackId}/${fileName}`;
+  const fileRef = ref(storage, storagePath);
+  const task = uploadBytesResumable(fileRef, file, { contentType: file.type || 'audio/wav' });
+  return { task, storagePath };
+}
+
+export async function fsReorderTracks(userId: string, tracks: Track[]): Promise<void> {
+  const batch = writeBatch(db);
+  tracks.forEach((track, index) => {
+    const trackRef = doc(db, 'users', userId, 'tracks', track.id);
+    batch.update(trackRef, { order: index, updatedAt: serverTimestamp() });
+  });
+  await batch.commit();
 }

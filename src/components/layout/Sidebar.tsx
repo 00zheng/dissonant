@@ -1,7 +1,8 @@
 import React from 'react';
-import { Library, Folder, Disc, Settings, Plus } from 'lucide-react';
+import { Library, Folder, Disc, LogOut, LogIn, Plus } from 'lucide-react';
 import { Project, ViewMode } from '../../types';
 import { clsx } from 'clsx';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -11,6 +12,7 @@ interface SidebarProps {
   onCreateProject?: () => void;
   projects?: Project[];
   onProjectSelect?: (project: Project) => void;
+  onOpenAuth: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -21,7 +23,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreateProject,
   projects = [],
   onProjectSelect,
+  onOpenAuth,
 }) => {
+  const { user, logout } = useAuth();
+
   const mainNavItems = [
     { id: 'library', label: 'Library', icon: Library },
     { id: 'folders', label: 'Folders', icon: Folder },
@@ -29,6 +34,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const recentProjects = projects.slice(0, 5);
+
+  const getInitials = (name?: string | null, email?: string | null) => {
+    if (name && name.trim()) return name.trim().charAt(0).toUpperCase();
+    if (email && email.trim()) return email.trim().charAt(0).toUpperCase();
+    return 'U';
+  };
 
   return (
     <aside className="w-64 bg-[#0E0E0E] border-r border-[#282828] h-full flex flex-col justify-between select-none">
@@ -41,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <h1 className="font-bold text-base tracking-wide text-[#E5E2E1]">Dissonant</h1>
-              <p className="text-[11px] text-[#E8BDB3]/60">Personal Workspace</p>
+              <p className="text-[11px] text-[#E8BDB3]/60">Cloud Workspace</p>
             </div>
           </div>
         </div>
@@ -124,19 +135,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Sidebar Footer */}
-      <div className="p-4 border-t border-[#282828] bg-[#0E0E0E] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-[#2A2A2A] border border-[#282828] flex items-center justify-center font-semibold text-xs text-[#E5E2E1]">
-            N
+      {/* Sidebar Footer / User Account */}
+      <div className="p-4 border-t border-[#282828] bg-[#0E0E0E]">
+        {user ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt="Profile"
+                  className="w-7 h-7 rounded-full border border-[#282828] object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-[#2A2A2A] border border-[#282828] flex items-center justify-center font-semibold text-xs text-[#E5E2E1] shrink-0">
+                  {getInitials(user.displayName, user.email)}
+                </div>
+              )}
+              <div className="leading-tight min-w-0">
+                <p className="font-semibold text-xs text-[#E5E2E1] truncate">
+                  {user.displayName || user.email?.split('@')[0] || 'User'}
+                </p>
+                <p className="text-[10px] text-[#E8BDB3]/50 truncate">{user.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              title="Sign Out"
+              className="text-[#E8BDB3]/50 hover:text-[#FF3B00] p-1.5 rounded transition-colors cursor-pointer shrink-0 ml-1"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="leading-none">
-            <p className="font-semibold text-xs text-[#E5E2E1]">Nocturne</p>
-          </div>
-        </div>
-        <button className="text-[#E8BDB3]/50 hover:text-white p-1 rounded transition-colors cursor-pointer">
-          <Settings className="w-4 h-4" />
-        </button>
+        ) : (
+          <button
+            onClick={onOpenAuth}
+            className="w-full bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-[#E5E2E1] font-semibold py-2 px-3 rounded-[4px] flex items-center justify-center gap-2 text-xs transition-colors cursor-pointer"
+          >
+            <LogIn className="w-4 h-4 text-[#FF3B00]" />
+            <span>Sign In / Register</span>
+          </button>
+        )}
       </div>
     </aside>
   );
