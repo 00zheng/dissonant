@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Project } from '../../types';
 import { Card } from '../ui/Card';
 import { Play, MoreVertical, Edit2, FolderInput, Trash2 } from 'lucide-react';
+
 import { usePlayer } from '../../context/PlayerContext';
 import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
+import { DropdownPortal } from '../ui/DropdownPortal';
 
 interface ProjectCardProps {
   project: Project;
@@ -23,6 +26,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   const { playTrack, currentProject, isPlaying } = usePlayer();
   const isCurrentPlayingProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
+  const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
 
   const playableTrack = project.tracks?.find(
     (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
@@ -36,9 +40,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     }
   };
 
-  const handleMenuClick = (e: React.MouseEvent) => {
+  const handleMenuClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    setShowMenu(!showMenu);
+    if (showMenu) {
+      setShowMenu(false);
+      setMenuTriggerRect(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setMenuTriggerRect(rect);
+      setShowMenu(true);
+    }
   };
 
   return (
@@ -59,13 +70,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         {/* Hover Overlay with Play Button if real audio exists */}
         {hasPlayableAudio && (
           <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center p-4">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.92 }}
               onClick={handlePlayHero}
-              className="w-12 h-12 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+              className="w-12 h-12 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-lg hover:scale-103 transition-transform cursor-pointer"
               title="Play Project"
             >
               <Play className="w-5 h-5 fill-white ml-0.5" />
-            </button>
+            </motion.button>
           </div>
         )}
 
@@ -74,63 +86,71 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <div className="absolute bottom-3 right-3 bg-[#FF3B00] w-3 h-3 rounded-full shadow-md" />
         )}
 
-        {/* Project Context Menu */}
+        {/* Project Context Menu Trigger */}
         {(onEditProject || onMoveProject || onDeleteProject) && (
           <div className="absolute top-3 right-3 z-10">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.90 }}
               onClick={handleMenuClick}
               className="p-1.5 rounded-[4px] bg-[#0E0E0E]/80 backdrop-blur-xs border border-[#282828] text-[#E5E2E1] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
               title="Project Options"
             >
               <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {showMenu && (
-              <div
-                className="absolute right-0 top-8 w-40 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs z-30"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {onEditProject && (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onEditProject(project);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Rename</span>
-                  </button>
-                )}
-                {onMoveProject && (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onMoveProject(project);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                  >
-                    <FolderInput className="w-3.5 h-3.5" />
-                    <span>Move to Folder</span>
-                  </button>
-                )}
-                {onDeleteProject && (
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onDeleteProject(project);
-                    }}
-                    className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
-                  </button>
-                )}
-              </div>
-            )}
+            </motion.button>
           </div>
         )}
       </div>
+
+      {/* Options Dropdown via Portal */}
+      <DropdownPortal
+        isOpen={showMenu}
+        onClose={() => {
+          setShowMenu(false);
+          setMenuTriggerRect(null);
+        }}
+        triggerRect={menuTriggerRect}
+        className="w-40"
+      >
+        {onEditProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onEditProject(project);
+            }}
+            className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            <span>Rename</span>
+          </button>
+        )}
+        {onMoveProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onMoveProject(project);
+            }}
+            className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <FolderInput className="w-3.5 h-3.5" />
+            <span>Move to Folder</span>
+          </button>
+        )}
+        {onDeleteProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onDeleteProject(project);
+            }}
+            className="w-full text-left px-3 py-2 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete</span>
+          </button>
+        )}
+      </DropdownPortal>
 
       {/* Info Block */}
       <div className="p-3 sm:p-4 flex flex-col justify-between flex-1 gap-2">

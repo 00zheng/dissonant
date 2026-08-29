@@ -30,17 +30,24 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [internalValue, setInternalValue] = useState<number | null>(null);
 
+  const isInteractive = Boolean(onChange || onScrub || onScrubStart || onScrubEnd);
+
   const calculatePercentage = (clientX: number) => {
     if (!barRef.current) return 0;
     const rect = barRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
     const pos = clientX - rect.left;
     return Math.max(0, Math.min(100, (pos / rect.width) * 100));
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onChange && !onScrubStart) return;
+    if (!isInteractive) return;
     setIsDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // safe fallback if pointer capture fails
+    }
     
     const pct = calculatePercentage(e.clientX);
     setInternalValue(pct);
@@ -59,7 +66,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     if (!isDragging) return;
     setIsDragging(false);
     setInternalValue(null);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // safe fallback
+    }
     
     const pct = calculatePercentage(e.clientX);
     onScrubEnd?.(pct);
@@ -70,12 +83,17 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     if (!isDragging) return;
     setIsDragging(false);
     setInternalValue(null);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // safe fallback
+    }
     
-    // On cancel, we might want to revert or just end where it was.
-    // Usually ending where it was is safer.
     const pct = calculatePercentage(e.clientX);
     onScrubEnd?.(pct);
+    onChange?.(pct);
   };
 
   const hasLoopRegion =
@@ -93,7 +111,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       className={clsx(
-        'relative w-full cursor-pointer h-4 flex items-center group select-none',
+        'relative w-full cursor-pointer h-4 flex items-center group select-none touch-none',
         className
       )}
     >
@@ -140,7 +158,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       )}
 
       {/* Handle Knob (visible on hover or dragging) */}
-      {(onChange || onScrubStart) && (
+      {isInteractive && (
         <div
           className={clsx(
             "absolute w-3 h-3 bg-white rounded-full shadow border border-[#FF3B00] transition-opacity duration-150 transform -translate-x-1/2",

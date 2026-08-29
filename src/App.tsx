@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, MotionConfig } from 'motion/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import { Sidebar } from './components/layout/Sidebar';
@@ -18,6 +19,8 @@ import { UploadTrackModal } from './components/ui/UploadTrackModal';
 import { TrackModal } from './components/ui/TrackModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { Folder, Project, Track, ViewMode, RouteState } from './types';
+import { pageViewVariants } from './constants/motion';
+
 import {
   initUserData,
   fsSaveFolder,
@@ -547,71 +550,156 @@ export const AppContent: React.FC = () => {
 
         {/* Scrollable Main Screen Content */}
         <main className="flex-1 overflow-y-auto bg-[#000000]">
-          {!user ? (
-            /* Logged Out Welcome View */
-            <div className="min-h-full flex flex-col items-center justify-center p-5 sm:p-8 text-center max-w-xl mx-auto pb-44">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#131313] border border-[#282828] rounded-[8px] flex items-center justify-center mb-4 sm:mb-6 shadow-xl">
-                <Music2 className="w-7 h-7 sm:w-8 sm:h-8 text-[#FF3B00]" />
-              </div>
-              <span className="text-xs font-bold tracking-[0.2em] text-[#FF3B00] uppercase mb-2">
-                Dissonant Cloud
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#E5E2E1] mb-2.5 sm:mb-3">
-                Your Personal Music Workspace
-              </h1>
-              <p className="text-xs sm:text-sm text-[#E8BDB3]/70 mb-6 sm:mb-8 leading-relaxed max-w-md">
-                Sign in to synchronize your folders, music projects, and audio files across devices with isolated cloud storage.
-              </p>
+          <motion.div
+            key={route.type + (route.type === 'folder_detail' ? `-${route.folderId}` : route.type === 'project_detail' ? `-${route.projectId}` : '') + (user ? '-auth' : '-guest')}
+            variants={pageViewVariants}
+            initial="initial"
+            animate="animate"
+            className="min-h-full flex flex-col"
+          >
+            {!user ? (
+              /* Logged Out Welcome View */
+              <div className="min-h-full flex flex-col items-center justify-center p-5 sm:p-8 text-center max-w-xl mx-auto pb-44">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#131313] border border-[#282828] rounded-[8px] flex items-center justify-center mb-4 sm:mb-6 shadow-xl">
+                  <Music2 className="w-7 h-7 sm:w-8 sm:h-8 text-[#FF3B00]" />
+                </div>
+                <span className="text-xs font-bold tracking-[0.2em] text-[#FF3B00] uppercase mb-2">
+                  Dissonant Cloud
+                </span>
+                <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#E5E2E1] mb-2.5 sm:mb-3">
+                  Your Personal Music Workspace
+                </h1>
+                <p className="text-xs sm:text-sm text-[#E8BDB3]/70 mb-6 sm:mb-8 leading-relaxed max-w-md">
+                  Sign in to synchronize your folders, music projects, and audio files across devices with isolated cloud storage.
+                </p>
 
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full max-w-xs mb-8 sm:mb-10">
-                <button
-                  onClick={() => openAuth('signin')}
-                  className="flex-1 bg-[#E5E2E1] hover:bg-white text-black font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Sign In</span>
-                </button>
-                <button
-                  onClick={() => openAuth('signup')}
-                  className="flex-1 bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
-                >
-                  <span>Create Account</span>
-                </button>
-              </div>
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full max-w-xs mb-8 sm:mb-10">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => openAuth('signin')}
+                    className="flex-1 bg-[#E5E2E1] hover:bg-white text-black font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Sign In</span>
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => openAuth('signup')}
+                    className="flex-1 bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white font-bold py-2.5 sm:py-3 px-5 rounded-[4px] flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition-all cursor-pointer min-h-[44px]"
+                  >
+                    <span>Create Account</span>
+                  </motion.button>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full pt-6 sm:pt-8 border-t border-[#282828] text-left">
-                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
-                  <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">User Isolation</h4>
-                  <p className="text-[11px] text-[#E8BDB3]/50">Every project and song is secured under your unique UID.</p>
-                </div>
-                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <Database className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
-                  <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Cloud Firestore</h4>
-                  <p className="text-[11px] text-[#E8BDB3]/50">Instant metadata sync with real-time playlist ordering.</p>
-                </div>
-                <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
-                  <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
-                  <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Local Audio Cache</h4>
-                  <p className="text-[11px] text-[#E8BDB3]/50">High-performance audio processing with zero bandwidth lag.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full pt-6 sm:pt-8 border-t border-[#282828] text-left">
+                  <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                    <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
+                    <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">User Isolation</h4>
+                    <p className="text-[11px] text-[#E8BDB3]/50">Every project and song is secured under your unique UID.</p>
+                  </div>
+                  <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                    <Database className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
+                    <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Cloud Firestore</h4>
+                    <p className="text-[11px] text-[#E8BDB3]/50">Instant metadata sync with real-time playlist ordering.</p>
+                  </div>
+                  <div className="bg-[#0E0E0E] p-3.5 sm:p-4 rounded-[4px] border border-[#1C1B1B]">
+                    <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF3B00] mb-2" />
+                    <h4 className="text-xs font-bold text-[#E5E2E1] mb-1">Local Audio Cache</h4>
+                    <p className="text-[11px] text-[#E8BDB3]/50">High-performance audio processing with zero bandwidth lag.</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : dataLoading ? (
-            <div className="min-h-full flex flex-col items-center justify-center p-12">
-              <Loader2 className="w-7 h-7 animate-spin text-[#FF3B00] mb-3" />
-              <span className="text-xs font-bold tracking-widest text-[#E8BDB3]/60 uppercase">
-                Loading Your Music...
-              </span>
-            </div>
-          ) : route.type === 'folder_detail' ? (
-            selectedFolder ? (
-              <FolderDetailView
-                folder={selectedFolder}
+            ) : dataLoading ? (
+              <div className="min-h-full flex flex-col items-center justify-center p-12">
+                <Loader2 className="w-7 h-7 animate-spin text-[#FF3B00] mb-3" />
+                <span className="text-xs font-bold tracking-widest text-[#E8BDB3]/60 uppercase">
+                  Loading Your Music...
+                </span>
+              </div>
+            ) : route.type === 'folder_detail' ? (
+              selectedFolder ? (
+                <FolderDetailView
+                  folder={selectedFolder}
+                  projects={projects}
+                  searchQuery={searchQuery}
+                  onBack={() => navigate('/folders')}
+                  onProjectSelect={handleProjectSelect}
+                  onEditFolder={handleOpenEditFolder}
+                  onDeleteFolder={handlePromptDeleteFolder}
+                  onCreateProject={handleOpenCreateProject}
+                  onEditProject={handleOpenEditProject}
+                  onMoveProject={handleOpenMoveProject}
+                  onDeleteProject={handlePromptDeleteProject}
+                />
+              ) : (
+                <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
+                  <p className="text-lg font-bold text-[#E5E2E1]">Folder Not Found</p>
+                  <p className="text-xs text-[#E8BDB3]/60">The requested folder does not exist or has been deleted.</p>
+                  <button
+                    onClick={() => navigate('/folders')}
+                    className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Folders</span>
+                  </button>
+                </div>
+              )
+            ) : route.type === 'project_detail' ? (
+              selectedProject ? (
+                <ProjectDetailView
+                  project={selectedProject}
+                  onEditProject={handleOpenEditProject}
+                  onMoveProject={handleOpenMoveProject}
+                  onDeleteProject={handlePromptDeleteProject}
+                  onUploadTracks={handleOpenUploadTracks}
+                  onEditTrack={handleOpenEditTrack}
+                  onDeleteTrack={handlePromptDeleteTrack}
+                  onReorderTracks={handleReorderTracks}
+                  onChangeCover={handleChangeCover}
+                  onRemoveCover={handleRemoveCover}
+                />
+              ) : (
+                <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
+                  <p className="text-lg font-bold text-[#E5E2E1]">Project Not Found</p>
+                  <p className="text-xs text-[#E8BDB3]/60">The requested project does not exist or has been deleted.</p>
+                  <button
+                    onClick={() => navigate('/projects')}
+                    className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Projects</span>
+                  </button>
+                </div>
+              )
+            ) : route.type === 'folders' ? (
+              <FoldersView
+                folders={computedFolders}
+                searchQuery={searchQuery}
+                onFolderSelect={handleFolderSelect}
+                onCreateFolder={handleOpenCreateFolder}
+                onEditFolder={handleOpenEditFolder}
+                onDeleteFolder={handlePromptDeleteFolder}
+              />
+            ) : route.type === 'projects' ? (
+              <ProjectsView
                 projects={projects}
                 searchQuery={searchQuery}
-                onBack={() => navigate('/folders')}
                 onProjectSelect={handleProjectSelect}
+                onCreateProject={handleOpenCreateProject}
+                onEditProject={handleOpenEditProject}
+                onMoveProject={handleOpenMoveProject}
+                onDeleteProject={handlePromptDeleteProject}
+              />
+            ) : (
+              <LibraryView
+                folders={computedFolders}
+                projects={projects}
+                searchQuery={searchQuery}
+                onProjectSelect={handleProjectSelect}
+                onFolderSelect={handleFolderSelect}
+                onViewAllFolders={() => navigate('/folders')}
+                onViewAllProjects={() => navigate('/projects')}
+                onCreateFolder={handleOpenCreateFolder}
                 onEditFolder={handleOpenEditFolder}
                 onDeleteFolder={handlePromptDeleteFolder}
                 onCreateProject={handleOpenCreateProject}
@@ -619,83 +707,8 @@ export const AppContent: React.FC = () => {
                 onMoveProject={handleOpenMoveProject}
                 onDeleteProject={handlePromptDeleteProject}
               />
-            ) : (
-              <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
-                <p className="text-lg font-bold text-[#E5E2E1]">Folder Not Found</p>
-                <p className="text-xs text-[#E8BDB3]/60">The requested folder does not exist or has been deleted.</p>
-                <button
-                  onClick={() => navigate('/folders')}
-                  className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Folders</span>
-                </button>
-              </div>
-            )
-          ) : route.type === 'project_detail' ? (
-            selectedProject ? (
-              <ProjectDetailView
-                project={selectedProject}
-                onEditProject={handleOpenEditProject}
-                onMoveProject={handleOpenMoveProject}
-                onDeleteProject={handlePromptDeleteProject}
-                onUploadTracks={handleOpenUploadTracks}
-                onEditTrack={handleOpenEditTrack}
-                onDeleteTrack={handlePromptDeleteTrack}
-                onReorderTracks={handleReorderTracks}
-                onChangeCover={handleChangeCover}
-                onRemoveCover={handleRemoveCover}
-              />
-            ) : (
-              <div className="py-20 px-8 text-center max-w-md mx-auto space-y-4">
-                <p className="text-lg font-bold text-[#E5E2E1]">Project Not Found</p>
-                <p className="text-xs text-[#E8BDB3]/60">The requested project does not exist or has been deleted.</p>
-                <button
-                  onClick={() => navigate('/projects')}
-                  className="bg-[#1C1B1B] hover:bg-[#2A2A2A] border border-[#282828] text-white text-xs font-semibold py-2 px-4 rounded-[4px] inline-flex items-center gap-2 cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Projects</span>
-                </button>
-              </div>
-            )
-          ) : route.type === 'folders' ? (
-            <FoldersView
-              folders={computedFolders}
-              searchQuery={searchQuery}
-              onFolderSelect={handleFolderSelect}
-              onCreateFolder={handleOpenCreateFolder}
-              onEditFolder={handleOpenEditFolder}
-              onDeleteFolder={handlePromptDeleteFolder}
-            />
-          ) : route.type === 'projects' ? (
-            <ProjectsView
-              projects={projects}
-              searchQuery={searchQuery}
-              onProjectSelect={handleProjectSelect}
-              onCreateProject={handleOpenCreateProject}
-              onEditProject={handleOpenEditProject}
-              onMoveProject={handleOpenMoveProject}
-              onDeleteProject={handlePromptDeleteProject}
-            />
-          ) : (
-            <LibraryView
-              folders={computedFolders}
-              projects={projects}
-              searchQuery={searchQuery}
-              onProjectSelect={handleProjectSelect}
-              onFolderSelect={handleFolderSelect}
-              onViewAllFolders={() => navigate('/folders')}
-              onViewAllProjects={() => navigate('/projects')}
-              onCreateFolder={handleOpenCreateFolder}
-              onEditFolder={handleOpenEditFolder}
-              onDeleteFolder={handlePromptDeleteFolder}
-              onCreateProject={handleOpenCreateProject}
-              onEditProject={handleOpenEditProject}
-              onMoveProject={handleOpenMoveProject}
-              onDeleteProject={handlePromptDeleteProject}
-            />
-          )}
+            )}
+          </motion.div>
         </main>
 
         {/* Mobile Navigation */}
@@ -779,12 +792,15 @@ export const AppContent: React.FC = () => {
 
 export function App() {
   return (
-    <AuthProvider>
-      <PlayerProvider>
-        <AppContent />
-      </PlayerProvider>
-    </AuthProvider>
+    <MotionConfig reducedMotion="user">
+      <AuthProvider>
+        <PlayerProvider>
+          <AppContent />
+        </PlayerProvider>
+      </AuthProvider>
+    </MotionConfig>
   );
 }
 
 export default App;
+

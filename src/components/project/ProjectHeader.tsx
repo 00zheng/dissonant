@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
+import { DropdownPortal } from '../ui/DropdownPortal';
 
 interface ProjectHeaderProps {
   project: Project;
@@ -39,6 +40,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const { currentProject, isPlaying, playTrack, togglePlay } = usePlayer();
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
+  const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -271,84 +273,105 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             )}
 
             {(onEditProject || onMoveProject || onDeleteProject || onChangeCover) && (
-              <div className="relative sm:ml-auto">
+              <div className="sm:ml-auto">
                 <button
-                  onClick={() => setShowMenu(!showMenu)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (showMenu) {
+                      setShowMenu(false);
+                      setMenuTriggerRect(null);
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setMenuTriggerRect(rect);
+                      setShowMenu(true);
+                    }
+                  }}
                   className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-[#E8BDB3]/60 hover:text-white rounded-[4px] border border-[#282828] hover:bg-[#1C1B1B] transition-colors cursor-pointer"
                   title="Project Options"
                 >
                   <MoreHorizontal className="w-5 h-5" />
                 </button>
-
-                {showMenu && (
-                  <div
-                    className="absolute right-0 top-11 z-30 w-48 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-xl py-1 text-xs text-left select-none animate-in fade-in zoom-in-95 duration-100"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {onChangeCover && (
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          handleTriggerCoverUpload();
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <ImageIcon className="w-4 h-4" />
-                        <span>{hasCustomCover ? 'Replace Cover Art' : 'Upload Cover Art'}</span>
-                      </button>
-                    )}
-                    {hasCustomCover && onRemoveCover && (
-                      <button
-                        onClick={handleRemoveCoverClick}
-                        className="w-full text-left px-3.5 py-2.5 text-[#E8BDB3]/80 hover:bg-[#1C1B1B] hover:text-white flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <ImageOff className="w-4 h-4" />
-                        <span>Remove Cover Art</span>
-                      </button>
-                    )}
-                    {onEditProject && (
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          onEditProject(project);
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        <span>Rename Project</span>
-                      </button>
-                    )}
-                    {onMoveProject && (
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          onMoveProject(project);
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <FolderInput className="w-4 h-4" />
-                        <span>Move to Folder</span>
-                      </button>
-                    )}
-                    {onDeleteProject && (
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          onDeleteProject(project);
-                        }}
-                        className="w-full text-left px-3.5 py-2.5 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete Project</span>
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Project Options Dropdown via Portal */}
+      <DropdownPortal
+        isOpen={showMenu}
+        onClose={() => {
+          setShowMenu(false);
+          setMenuTriggerRect(null);
+        }}
+        triggerRect={menuTriggerRect}
+        className="w-48"
+      >
+        {onChangeCover && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              handleTriggerCoverUpload();
+            }}
+            className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer transition-colors"
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>{hasCustomCover ? 'Replace Cover Art' : 'Upload Cover Art'}</span>
+          </button>
+        )}
+        {hasCustomCover && onRemoveCover && (
+          <button
+            onClick={() => {
+              setMenuTriggerRect(null);
+              handleRemoveCoverClick();
+            }}
+            className="w-full text-left px-3.5 py-2.5 text-[#E8BDB3]/80 hover:bg-[#1C1B1B] hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors"
+          >
+            <ImageOff className="w-4 h-4" />
+            <span>Remove Cover Art</span>
+          </button>
+        )}
+        {onEditProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onEditProject(project);
+            }}
+            className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer transition-colors"
+          >
+            <Edit2 className="w-4 h-4" />
+            <span>Rename Project</span>
+          </button>
+        )}
+        {onMoveProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onMoveProject(project);
+            }}
+            className="w-full text-left px-3.5 py-2.5 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer transition-colors"
+          >
+            <FolderInput className="w-4 h-4" />
+            <span>Move to Folder</span>
+          </button>
+        )}
+        {onDeleteProject && (
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              setMenuTriggerRect(null);
+              onDeleteProject(project);
+            }}
+            className="w-full text-left px-3.5 py-2.5 text-[#FF3B00] hover:bg-[#1C1B1B] flex items-center gap-2.5 cursor-pointer transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete Project</span>
+          </button>
+        )}
+      </DropdownPortal>
     </div>
   );
 };

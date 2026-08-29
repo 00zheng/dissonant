@@ -17,10 +17,13 @@ export const DropdownPortal: React.FC<DropdownPortalProps> = ({
   className = '',
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
   useLayoutEffect(() => {
-    if (!isOpen || !triggerRect) return;
+    if (!isOpen || !triggerRect) {
+      setPosition(null);
+      return;
+    }
 
     const updatePosition = () => {
       const menuEl = menuRef.current;
@@ -97,10 +100,13 @@ export const DropdownPortal: React.FC<DropdownPortalProps> = ({
       ref={menuRef}
       style={{
         position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
+        top: position ? `${position.top}px` : '-9999px',
+        left: position ? `${position.left}px` : '-9999px',
+        visibility: position ? 'visible' : 'hidden',
+        opacity: position ? 1 : 0,
+        transition: 'opacity 100ms ease-out',
       }}
-      className={`z-50 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-2xl py-1 text-xs text-left select-none animate-in fade-in zoom-in-95 duration-100 ${className}`}
+      className={`z-50 bg-[#2A2A2A] border border-[#282828] rounded-[6px] shadow-2xl py-1 text-xs text-left select-none ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       {children}

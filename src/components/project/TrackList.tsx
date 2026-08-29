@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Track, Project } from '../../types';
-import { Play, Pause, MoreHorizontal, Download, GripVertical, Edit2, Trash2 } from 'lucide-react';
+import { Play, Pause, MoreHorizontal, Download, GripVertical, Edit2, Trash2, ListMusic } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { clsx } from 'clsx';
 import { DropdownPortal } from '../ui/DropdownPortal';
+
 
 interface TrackListProps {
   tracks: Track[];
@@ -20,7 +22,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onDeleteTrack,
   onReorderTracks,
 }) => {
-  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, togglePlay, addToQueue } = usePlayer();
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -123,7 +125,8 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {/* Index / Play Button */}
                 <div className="w-6 shrink-0 flex items-center justify-center">
                   {hasRealAudio && isTrackPlaying ? (
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
                       onClick={(e) => {
                         e.stopPropagation();
                         togglePlay();
@@ -131,7 +134,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                       className="text-[#FF3B00] cursor-pointer p-1"
                     >
                       <Pause className="w-4 h-4 fill-[#FF3B00]" />
-                    </button>
+                    </motion.button>
                   ) : (
                     <span className="font-mono text-xs text-[#E8BDB3]/50">
                       {orderNumber}
@@ -151,7 +154,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                       {track.title}
                     </p>
                     {track.versionTag && (
-                      <span className="px-1.5 py-0.2 bg-[#0E0E0E] border border-[#282828] text-[9px] text-[#E8BDB3]/60 rounded-[3px]">
+                      <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">
                         {track.versionTag}
                       </span>
                     )}
@@ -171,13 +174,14 @@ export const TrackList: React.FC<TrackListProps> = ({
                 </span>
 
                 {(onEditTrack || onDeleteTrack || hasRealAudio) && (
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
                     onClick={(e) => toggleMenu(e, track.id)}
                     className="p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
                     title="Track Options"
                   >
                     <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  </motion.button>
                 )}
               </div>
             </div>
@@ -250,19 +254,21 @@ export const TrackList: React.FC<TrackListProps> = ({
                     <div className="relative flex items-center justify-center h-6 w-6 mx-auto">
                       {hasRealAudio ? (
                         isTrackPlaying ? (
-                          <button
+                          <motion.button
+                            whileTap={{ scale: 0.92 }}
                             onClick={(e) => {
                               e.stopPropagation();
                               togglePlay();
                             }}
-                            className="text-[#FF3B00] hover:scale-110 transition-transform cursor-pointer"
+                            className="text-[#FF3B00] hover:scale-105 transition-transform cursor-pointer"
                           >
                             <Pause className="w-4 h-4 fill-[#FF3B00]" />
-                          </button>
+                          </motion.button>
                         ) : (
                           <>
                             <span className="group-hover:hidden font-mono text-xs">{index + 1}</span>
-                            <button
+                            <motion.button
+                              whileTap={{ scale: 0.92 }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 playTrack(track, project);
@@ -271,7 +277,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                               title="Play Track"
                             >
                               <Play className="w-4 h-4 fill-current ml-0.5" />
-                            </button>
+                            </motion.button>
                           </>
                         )
                       ) : (
@@ -289,7 +295,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                             {track.title}
                           </p>
                           {track.versionTag && (
-                            <span className="px-1.5 py-0.2 bg-[#0E0E0E] border border-[#282828] text-[10px] text-[#E8BDB3]/60 rounded-[3px]">
+                            <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">
                               {track.versionTag}
                             </span>
                           )}
@@ -312,7 +318,8 @@ export const TrackList: React.FC<TrackListProps> = ({
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {hasRealAudio && (
-                        <a
+                        <motion.a
+                          whileTap={{ scale: 0.92 }}
                           href={track.audioUrl}
                           download={`${track.title}.mp3`}
                           onClick={(e) => e.stopPropagation()}
@@ -320,17 +327,18 @@ export const TrackList: React.FC<TrackListProps> = ({
                           title="Download Track"
                         >
                           <Download className="w-3.5 h-3.5" />
-                        </a>
+                        </motion.a>
                       )}
 
                       {(onEditTrack || onDeleteTrack) && (
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.92 }}
                           onClick={(e) => toggleMenu(e, track.id)}
                           className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer"
                           title="Track Options"
                         >
                           <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
+                        </motion.button>
                       )}
                     </div>
                   </td>
@@ -359,15 +367,27 @@ export const TrackList: React.FC<TrackListProps> = ({
         {activeTrack && (
           <>
             {activeTrackHasRealAudio && (
-              <a
-                href={activeTrack.audioUrl}
-                download={`${activeTrack.title}.mp3`}
-                className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
-                onClick={closeMenu}
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download</span>
-              </a>
+              <>
+                <button
+                  onClick={() => {
+                    addToQueue(activeTrack);
+                    closeMenu();
+                  }}
+                  className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <ListMusic className="w-3.5 h-3.5" />
+                  <span>Add to queue</span>
+                </button>
+                <a
+                  href={activeTrack.audioUrl}
+                  download={`${activeTrack.title}.mp3`}
+                  className="w-full text-left px-3 py-2 text-[#E5E2E1] hover:bg-[#1C1B1B] flex items-center gap-2 cursor-pointer transition-colors"
+                  onClick={closeMenu}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </a>
+              </>
             )}
             {onEditTrack && (
               <button

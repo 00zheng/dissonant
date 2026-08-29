@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Repeat, Gauge, Shuffle, ListMusic } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
@@ -6,6 +7,9 @@ import { QueuePanel } from './QueuePanel';
 import { LoopEditor } from './LoopEditor';
 import { PlayerExpanded } from './PlayerExpanded';
 import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { iconCrossfadeVariants } from '../../constants/motion';
+
 
 const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -46,6 +50,9 @@ export const PlayerBar: React.FC = () => {
   const [scrubPreviewTime, setScrubPreviewTime] = useState(0);
   const [isQueuePanelOpen, setIsQueuePanelOpen] = useState(false);
   const [isExpandedOpen, setIsExpandedOpen] = useState(false);
+
+  useKeyboardShortcuts(isQueuePanelOpen, setIsQueuePanelOpen);
+
   if (!currentTrack) return null;
 
   const formatTime = (secs: number) => {
@@ -72,7 +79,6 @@ export const PlayerBar: React.FC = () => {
           onScrub={(pct) => {
             const newTime = (pct / 100) * duration;
             setScrubPreviewTime(newTime);
-            seek(newTime);
           }}
           onScrubEnd={(pct) => {
             setIsScrubbing(false);
@@ -116,55 +122,90 @@ export const PlayerBar: React.FC = () => {
         {/* Center: Playback Buttons & Timer */}
         <div className="flex flex-col items-center gap-1 shrink-0 md:flex-1 md:max-w-[500px]">
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.90 }}
               onClick={toggleShuffle}
               className={`transition-colors cursor-pointer p-1.5 md:p-2 flex items-center justify-center ${isShuffle ? 'text-[#FF3B00]' : 'text-[#E8BDB3]/60 hover:text-white'}`}
               title="Toggle Shuffle"
             >
               <Shuffle className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.90 }}
               onClick={playPrevious}
               className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1.5 md:p-2 flex items-center justify-center"
               title="Previous Track"
             >
               <SkipBack className="w-4 h-4 md:w-5 md:h-5 fill-current" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
               onClick={togglePlay}
-              className="w-10 h-10 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer shrink-0"
+              className="w-10 h-10 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full bg-[#FF3B00] text-white flex items-center justify-center shadow-md hover:scale-103 transition-transform cursor-pointer shrink-0 overflow-hidden"
               title={isPlaying ? 'Pause' : 'Play'}
             >
-              {isPlaying ? (
-                <Pause className="w-4 h-4 md:w-5 md:h-5 fill-white" />
-              ) : (
-                <Play className="w-4 h-4 md:w-5 md:h-5 fill-white ml-0.5 md:ml-1" />
-              )}
-            </button>
-            <button
+              <AnimatePresence mode="wait" initial={false}>
+                {isPlaying ? (
+                  <motion.div
+                    key="pause"
+                    variants={iconCrossfadeVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex items-center justify-center"
+                  >
+                    <Pause className="w-4 h-4 md:w-5 md:h-5 fill-white" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="play"
+                    variants={iconCrossfadeVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex items-center justify-center"
+                  >
+                    <Play className="w-4 h-4 md:w-5 md:h-5 fill-white ml-0.5 md:ml-1" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.90 }}
               onClick={playNext}
               className="text-[#E8BDB3]/60 hover:text-white transition-colors cursor-pointer p-1.5 md:p-2 flex items-center justify-center"
               title="Next Track"
             >
               <SkipForward className="w-4 h-4 md:w-5 md:h-5 fill-current" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.90 }}
               onClick={toggleRepeat}
               className={`transition-colors cursor-pointer p-1.5 md:p-2 flex items-center justify-center relative ${repeatMode !== 'off' ? 'text-[#FF3B00]' : 'text-[#E8BDB3]/60 hover:text-white'}`}
               title={`Repeat: ${repeatMode}`}
             >
               <Repeat className="w-4 h-4 md:w-5 md:h-5" />
-              {repeatMode === 'one' && (
-                <span className="absolute -top-1 -right-1 bg-[#1C1B1B] text-[#FF3B00] text-[8px] md:text-[9px] font-bold px-1 rounded-full border border-[#282828]">1</span>
-              )}
-            </button>
+              <AnimatePresence>
+                {repeatMode === 'one' && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.6 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute -top-1 -right-1 bg-[#1C1B1B] text-[#FF3B00] text-[8px] md:text-[9px] font-bold px-1 rounded-full border border-[#282828]"
+                  >
+                    1
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
           </div>
 
           {/* Time counters */}
-          <div className="hidden md:flex w-full items-center gap-3">
-            <span className="font-mono text-[11px] text-[#E8BDB3]/50 w-10 text-right shrink-0">{formatTime(displayTime)}</span>
-            <div className="h-1 flex-1 rounded-full opacity-0 pointer-events-none" /> {/* Spacer since bar is at top */}
-            <span className="font-mono text-[11px] text-[#E8BDB3]/50 w-10 text-left shrink-0">{formatTime(duration)}</span>
+          <div className="hidden md:flex items-center justify-center gap-1 font-mono text-[11px] text-[#E8BDB3]/60">
+            <span>{formatTime(displayTime)}</span>
+            <span className="text-[#E8BDB3]/30">/</span>
+            <span>{formatTime(duration)}</span>
           </div>
         </div>
 
@@ -172,7 +213,8 @@ export const PlayerBar: React.FC = () => {
         <div className="flex items-center justify-end gap-2 sm:gap-3 md:w-1/3 md:min-w-[200px] shrink-0">
           {/* Playback Speed Selector (Desktop) */}
           <div className="relative hidden md:block">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.94 }}
               onClick={() => setShowSpeedMenu(!showSpeedMenu)}
               className={`px-2 py-1 rounded-[4px] border border-[#282828] text-[11px] font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
                 playbackRate !== 1.0
@@ -183,7 +225,7 @@ export const PlayerBar: React.FC = () => {
             >
               <Gauge className="w-3.5 h-3.5" />
               <span>{playbackRate.toFixed(2).replace(/\.?0+$/, '')}x</span>
-            </button>
+            </motion.button>
 
             {showSpeedMenu && (
               <div
@@ -196,12 +238,13 @@ export const PlayerBar: React.FC = () => {
                 </div>
                 <div className="p-3 space-y-3">
                   <div className="flex items-center gap-3">
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.90 }}
                       onClick={() => setPlaybackRate(Math.max(0.5, playbackRate - 0.05))}
                       className="w-6 h-6 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white transition-colors cursor-pointer flex items-center justify-center font-bold"
                     >
                       -
-                    </button>
+                    </motion.button>
                     <input
                       type="range"
                       min="0.5"
@@ -211,23 +254,25 @@ export const PlayerBar: React.FC = () => {
                       onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
                       className="flex-1 w-24 h-1 bg-[#1C1B1B] rounded-full appearance-none cursor-pointer border border-[#282828] accent-[#FF3B00]"
                     />
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.90 }}
                       onClick={() => setPlaybackRate(Math.min(2.0, playbackRate + 0.05))}
                       className="w-6 h-6 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white transition-colors cursor-pointer flex items-center justify-center font-bold"
                     >
                       +
-                    </button>
+                    </motion.button>
                   </div>
                   {playbackRate !== 1.0 && (
                     <div className="flex justify-end">
-                      <button
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
                         onClick={() => {
                           setPlaybackRate(1.0);
                         }}
                         className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-[3px] bg-[#2A2A2A] text-[#E8BDB3]/70 hover:text-white border border-[#282828] transition-colors cursor-pointer"
                       >
                         Reset
-                      </button>
+                      </motion.button>
                     </div>
                   )}
                 </div>
@@ -237,7 +282,8 @@ export const PlayerBar: React.FC = () => {
 
           {/* A-B Looping Control Group (Desktop) */}
           <div className="hidden lg:flex items-center gap-1 bg-[#131313] border border-[#282828] rounded-[4px] p-0.5 text-[10px] font-mono">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.94 }}
               onClick={() => setIsLoopEditorOpen(true)}
               className={`px-2.5 py-1 rounded-[3px] transition-colors cursor-pointer flex items-center gap-1.5 ${
                 isLoopActive ? 'bg-[#FF3B00] text-white font-bold' : 'text-[#E8BDB3]/70 hover:bg-[#2A2A2A]'
@@ -246,43 +292,51 @@ export const PlayerBar: React.FC = () => {
             >
               <Repeat className="w-3.5 h-3.5" />
               <span>Loop</span>
-            </button>
+            </motion.button>
             
             {(loopA !== null || loopB !== null) && (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.94 }}
                 onClick={clearLoop}
                 className="px-1.5 py-0.5 text-[#FF3B00] hover:bg-[#2A2A2A] rounded-[3px] cursor-pointer"
                 title="Clear A-B Loop"
               >
                 Clear
-              </button>
+              </motion.button>
             )}
           </div>
 
           {/* Volume (Desktop) */}
           <div className="hidden sm:flex items-center gap-2 w-24">
-            <button onClick={toggleMute} className="text-[#E8BDB3]/60 hover:text-white cursor-pointer">
+            <motion.button
+              whileTap={{ scale: 0.90 }}
+              onClick={toggleMute}
+              className="text-[#E8BDB3]/60 hover:text-white cursor-pointer p-0.5"
+            >
               {isMuted || volume === 0 ? (
                 <VolumeX className="w-4 h-4 text-[#FF3B00]" />
               ) : (
                 <Volume2 className="w-4 h-4" />
               )}
-            </button>
+            </motion.button>
             <ProgressBar
               value={isMuted ? 0 : volume * 100}
+              onScrub={(pct) => setVolume(pct / 100)}
+              onScrubEnd={(pct) => setVolume(pct / 100)}
               onChange={(pct) => setVolume(pct / 100)}
               height={2}
             />
           </div>
 
           {/* Queue Button */}
-          <button
+          <motion.button
+            whileTap={{ scale: 0.90 }}
             onClick={() => setIsQueuePanelOpen(!isQueuePanelOpen)}
             className={`p-1.5 rounded-[4px] transition-colors cursor-pointer ${isQueuePanelOpen ? 'bg-[#FF3B00] text-white' : 'text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A]'}`}
             title="Play Queue"
           >
             <ListMusic className="w-4 h-4" />
-          </button>
+          </motion.button>
         </div>
       </div>
 
