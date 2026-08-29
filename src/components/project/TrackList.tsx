@@ -5,7 +5,6 @@ import { Play, Pause, MoreHorizontal, Download, GripVertical, Edit2, Trash2, Lis
 import { usePlayer } from '../../context/PlayerContext';
 import { clsx } from 'clsx';
 import { DropdownPortal } from '../ui/DropdownPortal';
-import { useMediaQuery } from '../../hooks/useMediaQuery';
 import {
   DndContext,
   closestCenter,
@@ -311,7 +310,6 @@ export const TrackList: React.FC<TrackListProps> = ({
   const { currentTrack, isPlaying, playTrack, togglePlay, addToQueue } = usePlayer();
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
-  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -352,56 +350,10 @@ export const TrackList: React.FC<TrackListProps> = ({
 
   return (
     <div className="w-full select-none">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {isDesktop ? (
-            /* Desktop Table Tracklist (>= md) */
-            <div className="w-full overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-[#282828] text-[#E8BDB3]/50 text-xs font-medium">
-                    <th className="py-3 px-2 w-8"></th>
-                    <th className="py-3 px-3 w-10 text-center">#</th>
-                    <th className="py-3 px-4">Title</th>
-                    <th className="py-3 px-4 text-right">Duration</th>
-                    <th className="py-3 px-4 w-20"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#282828]/50">
-                  {tracks.map((track, index) => {
-                    const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
-                    const isSelected = currentTrack?.id === track.id;
-
-                    return (
-                      <SortableDesktopRow
-                        key={track.id}
-                        track={track}
-                        index={index}
-                        project={project}
-                        isSelected={isSelected}
-                        isPlaying={isPlaying}
-                        hasRealAudio={hasRealAudio}
-                        onPlay={() => playTrack(track, project)}
-                        onTogglePlay={togglePlay}
-                        onToggleMenu={toggleMenu}
-                        onEditTrack={onEditTrack}
-                        onDeleteTrack={onDeleteTrack}
-                        isReorderable={Boolean(onReorderTracks)}
-                      />
-                    );
-                  })}
-                  {tracks.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-xs text-[#E8BDB3]/50">
-                        No tracks in this project yet. Click "Add Songs" above to upload MP3 or WAV files.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            /* Mobile Stacked Tracklist (< md) */
+      {/* Mobile Stacked Tracklist (< md) */}
+      <div className="md:hidden">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <div className="divide-y divide-[#282828]/60">
               {tracks.map((track, index) => {
                 const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
@@ -431,9 +383,59 @@ export const TrackList: React.FC<TrackListProps> = ({
                 </div>
               )}
             </div>
-          )}
-        </SortableContext>
-      </DndContext>
+          </SortableContext>
+        </DndContext>
+      </div>
+
+      {/* Desktop Table Tracklist (>= md) */}
+      <div className="hidden md:block w-full overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#282828] text-[#E8BDB3]/50 text-xs font-medium">
+                  <th className="py-3 px-2 w-8"></th>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-4">Title</th>
+                  <th className="py-3 px-4 text-right">Duration</th>
+                  <th className="py-3 px-4 w-20"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#282828]/50">
+                {tracks.map((track, index) => {
+                  const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
+                  const isSelected = currentTrack?.id === track.id;
+
+                  return (
+                    <SortableDesktopRow
+                      key={track.id}
+                      track={track}
+                      index={index}
+                      project={project}
+                      isSelected={isSelected}
+                      isPlaying={isPlaying}
+                      hasRealAudio={hasRealAudio}
+                      onPlay={() => playTrack(track, project)}
+                      onTogglePlay={togglePlay}
+                      onToggleMenu={toggleMenu}
+                      onEditTrack={onEditTrack}
+                      onDeleteTrack={onDeleteTrack}
+                      isReorderable={Boolean(onReorderTracks)}
+                    />
+                  );
+                })}
+                {tracks.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-xs text-[#E8BDB3]/50">
+                      No tracks in this project yet. Click "Add Songs" above to upload MP3 or WAV files.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
+      </div>
 
       {/* Global Dropdown Portal for Track Actions - Eliminates Overflow Clipping & Auto-Flips */}
       <DropdownPortal
