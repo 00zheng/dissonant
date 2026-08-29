@@ -63,10 +63,15 @@ export const LoopEditor: React.FC = () => {
 
     const t0 = performance.now();
     console.log(`[Waveform] editor opened for track ${currentTrack.id}`);
+    console.log(`[Waveform] audio URL available: ${!!currentTrack.audioUrl}`);
+    console.log(`[Waveform] media readyState: ${playerEngine.getMediaElement().readyState}`);
+    console.log(`[Waveform] media duration: ${playerEngine.getMediaElement().duration}`);
+
     setLoadingStatus(cached ? 'Loading from cache...' : 'Initializing...');
     setIsError(false);
     setIsReady(false);
 
+    // Completely decouple visual waveform from playback engine
     const ws = WaveSurfer.create({
       container: containerRef.current,
       waveColor: '#FF562D',
@@ -77,47 +82,79 @@ export const LoopEditor: React.FC = () => {
       barRadius: 2,
       height: 200,
       normalize: true,
-      media: playerEngine.getMediaElement(),
+      interact: false, // Prevent WaveSurfer from handling its own seeking
       peaks,
       duration,
+      // If we don't have cached peaks, provide the URL so WaveSurfer can fetch and decode it independently
+      url: !cached ? currentTrack.audioUrl : undefined,
+      fetchParams: {
+        cache: 'no-cache', // Bypass iOS Safari opaque caching if audio element already fetched it
+      }
     });
+
+    // Mute WaveSurfer's internal audio to guarantee it never interferes with iOS audio session
+    ws.setVolume(0);
 
     const wsRegions = ws.registerPlugin(RegionsPlugin.create());
 
     wavesurferRef.current = ws;
     regionsRef.current = wsRegions;
 
+    // Sync WaveSurfer visual cursor with the main player engine
+    const handleTimeUpdate = (time: number) => {
+      if (ws && isReady) {
+        ws.setTime(time);
+      }
+    };
+    const unsubscribeTime = playerEngine.onTimeUpdate(handleTimeUpdate);
+
+    // Allow clicking the waveform to seek the main player engine instead
+    ws.on('click', (relativeX) => {
+      const dur = playerEngine.getDuration();
+      if (dur) {
+        playerEngine.seek(relativeX * dur);
+      }
+    });
+
     ws.on('load', () => {
-      console.log(`[Waveform] load started — ${Math.round(performance.now() - t0)}ms`);
+      console.log(`[Waveform] load started — ${Math.round(performance.now() - t0)}ms elapsed`);
       setLoadingStatus('Loading...');
     });
     
     ws.on('loading', (percent) => {
-      console.log(`[Waveform] loading ${percent}% — ${Math.round(performance.now() - t0)}ms`);
+      console.log(`[Waveform] loading progress ${percent}% — ${Math.round(performance.now() - t0)}ms elapsed`);
       setLoadingStatus(`Loading waveform... ${percent}%`);
     });
 
     ws.on('decode', () => {
-      console.log(`[Waveform] decode started — ${Math.round(performance.now() - t0)}ms`);
+      console.log(`[Waveform] decode event — ${Math.round(performance.now() - t0)}ms elapsed`);
       setLoadingStatus('Decoding waveform...');
     });
 
-    ws.on('error', (err) => {
+    ws.on('error', (err: any) => {
       console.error(`[Waveform] ERROR —`, err);
+      console.log(`[Waveform] complete error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      console.log(`[Waveform] error elapsed time: ${Math.round(performance.now() - t0)}ms`);
       setIsError(true);
-      setLoadingStatus('Could not load waveform.');
+      // Show actual error message instead of generic swallow
+      setLoadingStatus(`Error: ${err?.message || 'Could not load waveform'}`);
     });
 
     let timeoutId = setTimeout(() => {
-      setIsError(true);
-      setLoadingStatus('Waveform is taking longer than expected.');
-    }, 15000);
+      if (!isReady && !isError) {
+        setIsError(true);
+        setLoadingStatus('Waveform is taking longer than expected.');
+      }
+    }, 20000);
 
     ws.on('ready', () => {
       clearTimeout(timeoutId);
       const tReady = performance.now();
-      console.log(`[Waveform] ready — ${Math.round(tReady - t0)}ms`);
+      console.log(`[Waveform] ready event — ${Math.round(tReady - t0)}ms elapsed`);
       setIsReady(true);
+
+      // Set initial time
+      ws.setTime(playerEngine.getCurrentTime());
 
       if (!cached && currentTrack) {
         try {
@@ -130,7 +167,7 @@ export const LoopEditor: React.FC = () => {
         }
       }
       
-      const audioDuration = ws.getDuration();
+      const audioDuration = ws.getDuration() || playerEngine.getDuration();
       const start = loopA !== null ? loopA : 0;
       const end = loopB !== null ? loopB : audioDuration || 10;
       
@@ -155,6 +192,7 @@ export const LoopEditor: React.FC = () => {
 
     return () => {
       clearTimeout(timeoutId);
+      unsubscribeTime();
       ws.destroy();
       setIsReady(false);
     };

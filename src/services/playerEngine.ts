@@ -64,6 +64,7 @@ export class AudioPlayerEngine {
           this.notifyLoopChange();
         }
         this.durationListeners.forEach((cb) => cb(dur));
+        this.syncMediaSessionPosition();
       }
     });
 
@@ -97,12 +98,36 @@ export class AudioPlayerEngine {
 
   private notifyStateChange() {
     this.stateListeners.forEach((cb) => cb(this.isPlayingState));
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = this.isPlayingState ? 'playing' : 'paused';
+    }
+    if (this.isPlayingState) {
+      this.syncMediaSessionPosition();
+    }
   }
 
   private notifyLoopChange() {
     this.loopListeners.forEach((cb) =>
       cb(this.loopAState, this.loopBState, this.isLoopActiveState)
     );
+  }
+
+  public syncMediaSessionPosition() {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+      try {
+        const dur = this.getDuration();
+        const curr = this.getCurrentTime();
+        if (dur && !isNaN(dur) && isFinite(dur) && curr >= 0 && curr <= dur) {
+          navigator.mediaSession.setPositionState({
+            duration: dur,
+            playbackRate: this.playbackRateState,
+            position: curr,
+          });
+        }
+      } catch (e) {
+        // Ignore errors if values are somehow invalid for the API
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -171,6 +196,7 @@ export class AudioPlayerEngine {
     this.currentTimeState = targetTime;
     this.audio.currentTime = targetTime;
     this.timeListeners.forEach((cb) => cb(targetTime));
+    this.syncMediaSessionPosition();
   }
 
   public setVolume(vol: number): void {
@@ -197,6 +223,7 @@ export class AudioPlayerEngine {
     this.playbackRateState = clamped;
     this.audio.playbackRate = clamped;
     this.rateListeners.forEach((cb) => cb(clamped));
+    this.syncMediaSessionPosition();
   }
 
   public getPlaybackRate(): number {

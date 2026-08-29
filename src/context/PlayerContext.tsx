@@ -425,6 +425,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const clearLoop = useCallback(() => playerEngine.clearLoop(), []);
   const setPlaybackRate = useCallback((rate: number) => playerEngine.setPlaybackRate(rate), []);
 
+  // --- Media Session API Integration ---
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => {
+        playerEngine.play();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        playerEngine.pause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrevious();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+      });
+      
+      // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
+      try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
+      try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
+    }
+  }, [playPrevious, playNext]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title || 'Unknown Title',
+        artist: currentTrack.artist || currentProject?.artist || 'Unknown Artist',
+        album: currentProject?.title || 'Dissonant',
+        artwork: (currentTrack.coverUrl || currentProject?.coverUrl) ? [
+          { src: currentTrack.coverUrl || currentProject?.coverUrl || '', sizes: '512x512', type: 'image/jpeg' },
+          { src: currentTrack.coverUrl || currentProject?.coverUrl || '', sizes: '192x192', type: 'image/jpeg' },
+        ] : undefined
+      });
+    }
+  }, [currentTrack, currentProject]);
+
   return (
     <PlayerContext.Provider
       value={{
