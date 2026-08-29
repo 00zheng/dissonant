@@ -120,10 +120,19 @@ export const LoopEditor: React.FC = () => {
 
   return createPortal(
     <div
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+      }}
       className="fixed inset-0 z-[150] bg-[#000000]/90 backdrop-blur-sm flex flex-col justify-center items-center select-none overflow-hidden touch-none p-4 md:p-10"
       onClick={() => setIsLoopEditorOpen(false)}
     >
-      <div className="absolute top-6 right-6">
+      <div
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        }}
+        className="absolute right-6"
+      >
         <motion.button
           whileTap={{ scale: 0.92 }}
           onClick={() => setIsLoopEditorOpen(false)}

@@ -5,6 +5,7 @@ import { Play, Pause, MoreHorizontal, Download, GripVertical, Edit2, Trash2, Lis
 import { usePlayer } from '../../context/PlayerContext';
 import { clsx } from 'clsx';
 import { DropdownPortal } from '../ui/DropdownPortal';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import {
   DndContext,
   closestCenter,
@@ -38,14 +39,28 @@ interface SortableMobileRowProps {
 }
 
 const SortableMobileRow = ({
-  track, index, project, isSelected, isPlaying, hasRealAudio, onPlay, onTogglePlay, onToggleMenu, onEditTrack, onDeleteTrack, isReorderable
+  track,
+  index,
+  project,
+  isSelected,
+  isPlaying,
+  hasRealAudio,
+  onPlay,
+  onTogglePlay,
+  onToggleMenu,
+  onEditTrack,
+  onDeleteTrack,
+  isReorderable,
 }: SortableMobileRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: track.id });
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : 0,
+    opacity: isDragging ? 0.95 : 1,
+    zIndex: isDragging ? 50 : 0,
+    backgroundColor: isDragging ? '#1C1B1B' : undefined,
+    borderLeft: isDragging ? '2px solid #FF3B00' : '2px solid transparent',
+    boxShadow: isDragging ? '0 8px 24px rgba(0, 0, 0, 0.6)' : undefined,
   };
 
   const isTrackPlaying = isSelected && isPlaying;
@@ -57,20 +72,35 @@ const SortableMobileRow = ({
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'px-3.5 py-3 flex items-center justify-between gap-3 transition-colors text-left relative bg-[#000000]',
+        'px-3.5 py-2.5 flex items-center justify-between gap-2 transition-colors text-left relative bg-[#000000]',
         hasRealAudio ? 'active:bg-[#1C1B1B]' : 'opacity-85 active:bg-[#161616]',
-        isSelected ? 'bg-[#1C1B1B]' : 'hover:bg-[#161616]'
+        isSelected && !isDragging ? 'bg-[#1C1B1B]' : ''
       )}
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {isReorderable ? (
-          <div {...attributes} {...listeners} className="w-6 shrink-0 flex items-center justify-center text-[#E8BDB3]/30 cursor-grab active:cursor-grabbing touch-none">
+          <div
+            {...attributes}
+            {...listeners}
+            className={clsx(
+              "w-11 h-11 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none -ml-2 transition-colors",
+              isDragging ? "text-[#FF3B00]" : "text-[#E8BDB3]/40 hover:text-white"
+            )}
+            title="Drag to reorder"
+          >
             <GripVertical className="w-4 h-4" />
           </div>
         ) : (
-          <div className="w-6 shrink-0 flex items-center justify-center">
+          <div className="w-8 shrink-0 flex items-center justify-center">
             {hasRealAudio && isTrackPlaying ? (
-              <motion.button whileTap={{ scale: 0.92 }} onClick={(e) => { e.stopPropagation(); onTogglePlay(); }} className="text-[#FF3B00] cursor-pointer p-1">
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePlay();
+                }}
+                className="text-[#FF3B00] cursor-pointer p-1"
+              >
                 <Pause className="w-4 h-4 fill-[#FF3B00]" />
               </motion.button>
             ) : (
@@ -79,10 +109,22 @@ const SortableMobileRow = ({
           </div>
         )}
 
-        <div className="min-w-0 flex-1 ml-1" onClick={() => { if (hasRealAudio) onPlay(); }} style={{ cursor: hasRealAudio ? 'pointer' : 'default' }}>
+        <div
+          className="min-w-0 flex-1 py-1"
+          onClick={() => {
+            if (hasRealAudio) onPlay();
+          }}
+          style={{ cursor: hasRealAudio ? 'pointer' : 'default' }}
+        >
           <div className="flex items-center gap-1.5 flex-wrap">
-            <p className={clsx('text-sm font-semibold truncate', isSelected ? 'text-[#FF3B00]' : 'text-[#E5E2E1]')}>{track.title}</p>
-            {track.versionTag && <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">{track.versionTag}</span>}
+            <p className={clsx('text-sm font-semibold truncate', isSelected ? 'text-[#FF3B00]' : 'text-[#E5E2E1]')}>
+              {track.title}
+            </p>
+            {track.versionTag && (
+              <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">
+                {track.versionTag}
+              </span>
+            )}
           </div>
           {secondaryMeta && <p className="text-[11px] text-[#E8BDB3]/50 truncate mt-0.5">{secondaryMeta}</p>}
         </div>
@@ -91,7 +133,11 @@ const SortableMobileRow = ({
       <div className="flex items-center gap-2 shrink-0">
         <span className="font-mono text-xs text-[#E8BDB3]/60">{track.durationFormatted}</span>
         {(onEditTrack || onDeleteTrack || hasRealAudio) && (
-          <motion.button whileTap={{ scale: 0.92 }} onClick={(e) => onToggleMenu(e, track.id)} className="p-1.5 text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#2A2A2A] transition-colors cursor-pointer">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={(e) => onToggleMenu(e, track.id)}
+            className="p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center text-[#E8BDB3]/60 hover:text-white rounded-[4px] hover:bg-[#2A2A2A] transition-colors cursor-pointer"
+          >
             <MoreHorizontal className="w-4 h-4" />
           </motion.button>
         )}
@@ -116,15 +162,28 @@ interface SortableDesktopRowProps {
 }
 
 const SortableDesktopRow = ({
-  track, index, project, isSelected, isPlaying, hasRealAudio, onPlay, onTogglePlay, onToggleMenu, onEditTrack, onDeleteTrack, isReorderable
+  track,
+  index,
+  project,
+  isSelected,
+  isPlaying,
+  hasRealAudio,
+  onPlay,
+  onTogglePlay,
+  onToggleMenu,
+  onEditTrack,
+  onDeleteTrack,
+  isReorderable,
 }: SortableDesktopRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: track.id });
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : 0,
-    backgroundColor: isDragging ? '#2A2A2A' : undefined
+    opacity: isDragging ? 0.95 : 1,
+    zIndex: isDragging ? 50 : 0,
+    backgroundColor: isDragging ? '#1C1B1B' : undefined,
+    borderLeft: isDragging ? '2px solid #FF3B00' : undefined,
+    boxShadow: isDragging ? '0 8px 24px rgba(0, 0, 0, 0.6)' : undefined,
   };
 
   const isTrackPlaying = isSelected && isPlaying;
@@ -137,24 +196,40 @@ const SortableDesktopRow = ({
       className={clsx(
         'group transition-colors text-sm relative bg-[#000000]',
         hasRealAudio ? 'hover:bg-[#1C1B1B]' : 'cursor-default opacity-85 hover:bg-[#161616]',
-        isSelected && 'bg-[#1C1B1B]',
-        isDragging && 'opacity-40'
+        isSelected && !isDragging && 'bg-[#1C1B1B]'
       )}
     >
-      <td className="py-3 px-2 text-center text-[#E8BDB3]/30 group-hover:text-[#E5E2E1] cursor-grab active:cursor-grabbing touch-none" {...(isReorderable ? { ...attributes, ...listeners } : {})}>
+      <td
+        className="py-3 px-2 text-center text-[#E8BDB3]/30 group-hover:text-[#E5E2E1] cursor-grab active:cursor-grabbing touch-none"
+        {...(isReorderable ? { ...attributes, ...listeners } : {})}
+      >
         {isReorderable && <GripVertical className="w-4 h-4 mx-auto opacity-0 group-hover:opacity-100 transition-opacity" />}
       </td>
       <td className="py-3 px-3 text-center text-xs text-[#E8BDB3]/50 group-hover:text-white">
         <div className="relative flex items-center justify-center h-6 w-6 mx-auto">
           {hasRealAudio ? (
             isTrackPlaying ? (
-              <motion.button whileTap={{ scale: 0.92 }} onClick={(e) => { e.stopPropagation(); onTogglePlay(); }} className="text-[#FF3B00] hover:scale-105 transition-transform cursor-pointer">
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePlay();
+                }}
+                className="text-[#FF3B00] hover:scale-105 transition-transform cursor-pointer"
+              >
                 <Pause className="w-4 h-4 fill-[#FF3B00]" />
               </motion.button>
             ) : (
               <>
                 <span className="group-hover:hidden font-mono text-xs">{index + 1}</span>
-                <motion.button whileTap={{ scale: 0.92 }} onClick={(e) => { e.stopPropagation(); onPlay(); }} className="hidden group-hover:block text-[#E5E2E1] hover:text-[#FF3B00] transition-colors cursor-pointer">
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPlay();
+                  }}
+                  className="hidden group-hover:block text-[#E5E2E1] hover:text-[#FF3B00] transition-colors cursor-pointer"
+                >
                   <Play className="w-4 h-4 fill-current ml-0.5" />
                 </motion.button>
               </>
@@ -164,12 +239,24 @@ const SortableDesktopRow = ({
           )}
         </div>
       </td>
-      <td className="py-3 px-4" onClick={() => { if (hasRealAudio) onPlay(); }} style={{ cursor: hasRealAudio ? 'pointer' : 'default' }}>
+      <td
+        className="py-3 px-4"
+        onClick={() => {
+          if (hasRealAudio) onPlay();
+        }}
+        style={{ cursor: hasRealAudio ? 'pointer' : 'default' }}
+      >
         <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <p className={clsx('font-medium text-[#E5E2E1]', hasRealAudio && 'group-hover:text-white', isSelected && 'text-[#FF3B00]')}>{track.title}</p>
-              {track.versionTag && <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">{track.versionTag}</span>}
+              <p className={clsx('font-medium text-[#E5E2E1]', hasRealAudio && 'group-hover:text-white', isSelected && 'text-[#FF3B00]')}>
+                {track.title}
+              </p>
+              {track.versionTag && (
+                <span className="font-mono text-[10px] uppercase font-medium px-1.5 py-0.5 bg-[#0E0E0E] border border-[#282828] text-[#E8BDB3]/70 rounded-[3px]">
+                  {track.versionTag}
+                </span>
+              )}
             </div>
             {secondaryMeta && <p className="text-xs text-[#E8BDB3]/50 truncate mt-0.5">{secondaryMeta}</p>}
           </div>
@@ -181,12 +268,22 @@ const SortableDesktopRow = ({
       <td className="py-3 px-4 text-right">
         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {hasRealAudio && (
-            <motion.a whileTap={{ scale: 0.92 }} href={track.audioUrl} download={`${track.title}.mp3`} onClick={(e) => e.stopPropagation()} className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer">
+            <motion.a
+              whileTap={{ scale: 0.92 }}
+              href={track.audioUrl}
+              download={`${track.title}.mp3`}
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer"
+            >
               <Download className="w-3.5 h-3.5" />
             </motion.a>
           )}
           {(onEditTrack || onDeleteTrack) && (
-            <motion.button whileTap={{ scale: 0.92 }} onClick={(e) => onToggleMenu(e, track.id)} className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer">
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={(e) => onToggleMenu(e, track.id)}
+              className="p-1.5 text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] rounded transition-colors cursor-pointer"
+            >
               <MoreHorizontal className="w-3.5 h-3.5" />
             </motion.button>
           )}
@@ -195,8 +292,6 @@ const SortableDesktopRow = ({
     </tr>
   );
 };
-
-
 
 interface TrackListProps {
   tracks: Track[];
@@ -216,6 +311,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   const { currentTrack, isPlaying, playTrack, togglePlay, addToQueue } = usePlayer();
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -246,9 +342,9 @@ export const TrackList: React.FC<TrackListProps> = ({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = tracks.findIndex(t => t.id === active.id);
-      const newIndex = tracks.findIndex(t => t.id === over.id);
-      if (onReorderTracks) {
+      const oldIndex = tracks.findIndex((t) => t.id === active.id);
+      const newIndex = tracks.findIndex((t) => t.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1 && onReorderTracks) {
         onReorderTracks(arrayMove(tracks, oldIndex, newIndex));
       }
     }
@@ -257,84 +353,85 @@ export const TrackList: React.FC<TrackListProps> = ({
   return (
     <div className="w-full select-none">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tracks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          
-          {/* Mobile Stacked Tracklist (< md) */}
-          <div className="md:hidden divide-y divide-[#282828]/60">
-            {tracks.map((track, index) => {
-              const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
-              const isSelected = currentTrack?.id === track.id;
-              
-              return (
-                <SortableMobileRow
-                  key={track.id}
-                  track={track}
-                  index={index}
-                  project={project}
-                  isSelected={isSelected}
-                  isPlaying={isPlaying}
-                  hasRealAudio={hasRealAudio}
-                  onPlay={() => playTrack(track, project)}
-                  onTogglePlay={togglePlay}
-                  onToggleMenu={toggleMenu}
-                  onEditTrack={onEditTrack}
-                  onDeleteTrack={onDeleteTrack}
-                  isReorderable={Boolean(onReorderTracks)}
-                />
-              );
-            })}
-            {tracks.length === 0 && (
-              <div className="py-12 text-center text-xs text-[#E8BDB3]/50 px-4">
-                No tracks in this project yet. Tap "Add Songs" above to upload audio files.
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Table Tracklist (>= md) */}
-          <div className="hidden md:block w-full overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#282828] text-[#E8BDB3]/50 text-xs font-medium">
-                  <th className="py-3 px-2 w-8"></th>
-                  <th className="py-3 px-3 w-10 text-center">#</th>
-                  <th className="py-3 px-4">Title</th>
-                  <th className="py-3 px-4 text-right">Duration</th>
-                  <th className="py-3 px-4 w-20"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#282828]/50">
-                {tracks.map((track, index) => {
-                  const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
-                  const isSelected = currentTrack?.id === track.id;
-
-                  return (
-                    <SortableDesktopRow
-                      key={track.id}
-                      track={track}
-                      index={index}
-                      project={project}
-                      isSelected={isSelected}
-                      isPlaying={isPlaying}
-                      hasRealAudio={hasRealAudio}
-                      onPlay={() => playTrack(track, project)}
-                      onTogglePlay={togglePlay}
-                      onToggleMenu={toggleMenu}
-                      onEditTrack={onEditTrack}
-                      onDeleteTrack={onDeleteTrack}
-                      isReorderable={Boolean(onReorderTracks)}
-                    />
-                  );
-                })}
-                {tracks.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-xs text-[#E8BDB3]/50">
-                      No tracks in this project yet. Click "Add Songs" above to upload MP3 or WAV files.
-                    </td>
+        <SortableContext items={tracks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {isDesktop ? (
+            /* Desktop Table Tracklist (>= md) */
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#282828] text-[#E8BDB3]/50 text-xs font-medium">
+                    <th className="py-3 px-2 w-8"></th>
+                    <th className="py-3 px-3 w-10 text-center">#</th>
+                    <th className="py-3 px-4">Title</th>
+                    <th className="py-3 px-4 text-right">Duration</th>
+                    <th className="py-3 px-4 w-20"></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#282828]/50">
+                  {tracks.map((track, index) => {
+                    const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
+                    const isSelected = currentTrack?.id === track.id;
+
+                    return (
+                      <SortableDesktopRow
+                        key={track.id}
+                        track={track}
+                        index={index}
+                        project={project}
+                        isSelected={isSelected}
+                        isPlaying={isPlaying}
+                        hasRealAudio={hasRealAudio}
+                        onPlay={() => playTrack(track, project)}
+                        onTogglePlay={togglePlay}
+                        onToggleMenu={toggleMenu}
+                        onEditTrack={onEditTrack}
+                        onDeleteTrack={onDeleteTrack}
+                        isReorderable={Boolean(onReorderTracks)}
+                      />
+                    );
+                  })}
+                  {tracks.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-xs text-[#E8BDB3]/50">
+                        No tracks in this project yet. Click "Add Songs" above to upload MP3 or WAV files.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            /* Mobile Stacked Tracklist (< md) */
+            <div className="divide-y divide-[#282828]/60">
+              {tracks.map((track, index) => {
+                const hasRealAudio = track.hasAudio !== false && Boolean(track.audioUrl) && !track.isSample;
+                const isSelected = currentTrack?.id === track.id;
+
+                return (
+                  <SortableMobileRow
+                    key={track.id}
+                    track={track}
+                    index={index}
+                    project={project}
+                    isSelected={isSelected}
+                    isPlaying={isPlaying}
+                    hasRealAudio={hasRealAudio}
+                    onPlay={() => playTrack(track, project)}
+                    onTogglePlay={togglePlay}
+                    onToggleMenu={toggleMenu}
+                    onEditTrack={onEditTrack}
+                    onDeleteTrack={onDeleteTrack}
+                    isReorderable={Boolean(onReorderTracks)}
+                  />
+                );
+              })}
+              {tracks.length === 0 && (
+                <div className="py-12 text-center text-xs text-[#E8BDB3]/50 px-4">
+                  No tracks in this project yet. Tap "Add Songs" above to upload audio files.
+                </div>
+              )}
+            </div>
+          )}
         </SortableContext>
       </DndContext>
 

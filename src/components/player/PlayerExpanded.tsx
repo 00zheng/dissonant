@@ -85,7 +85,11 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="fixed inset-0 z-[100] bg-[#000000]/95 backdrop-blur-xl flex flex-col justify-between p-4 sm:p-6 md:p-10 lg:p-12 select-none overflow-y-auto"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+      }}
+      className="fixed inset-0 z-[100] bg-[#000000]/95 backdrop-blur-xl flex flex-col justify-between px-4 sm:px-6 md:px-10 lg:px-12 select-none overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-label="Full music player"

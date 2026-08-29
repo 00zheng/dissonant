@@ -29,6 +29,10 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
           initial="initial"
           animate="animate"
           exit="exit"
+          style={{
+            paddingTop: 'max(1rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+            paddingBottom: 'max(1rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))',
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
           onClick={onClose}
         >
