@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { PlayerProvider } from './context/PlayerContext';
+import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { MobileNav } from './components/layout/MobileNav';
@@ -78,6 +78,7 @@ function getRoutePath(route: RouteState): string {
 
 export const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
+  const { updateCurrentProject } = usePlayer();
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -274,6 +275,7 @@ export const AppContent: React.FC = () => {
       } as Project;
       await fsSaveProject(user.uid, updated);
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      updateCurrentProject(updated);
     } else {
       const newProject: Project = {
         id: `proj-${Date.now()}`,
@@ -336,6 +338,7 @@ export const AppContent: React.FC = () => {
 
     await fsSaveProject(user.uid, updatedProject);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    updateCurrentProject(updatedProject);
   };
 
   const handleOpenEditTrack = (track: Track) => {
@@ -358,6 +361,7 @@ export const AppContent: React.FC = () => {
 
     await fsSaveProject(user.uid, updatedProject);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    updateCurrentProject(updatedProject);
   };
 
   const handlePromptDeleteTrack = (track: Track) => {
@@ -376,6 +380,7 @@ export const AppContent: React.FC = () => {
 
     await fsReorderTracks(user.uid, reorderedTracks);
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    updateCurrentProject(updatedProject);
   };
 
   // --- Cover Art Handlers ---
@@ -411,6 +416,7 @@ export const AppContent: React.FC = () => {
     console.log(`[CoverDebug] Firestore updated`);
 
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    updateCurrentProject(updatedProject);
     console.log(`[CoverDebug] local project state updated`);
 
     // Safely delete old storage object only after successful commit of the new one
@@ -438,6 +444,7 @@ export const AppContent: React.FC = () => {
     console.log(`[CoverDebug] Cover removed in Firestore`);
 
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    updateCurrentProject(updatedProject);
     console.log(`[CoverDebug] local project state updated`);
 
     if (oldCoverStoragePath) {
@@ -482,6 +489,7 @@ export const AppContent: React.FC = () => {
 
       await fsSaveProject(user.uid, updatedProject);
       setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+      updateCurrentProject(updatedProject);
     }
 
     setDeleteTarget(null);

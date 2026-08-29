@@ -1,4 +1,3 @@
-import SignalsmithStretch from 'signalsmith-stretch';
 export type PlayerStateCallback = (isPlaying: boolean) => void;
 export type TimeUpdateCallback = (currentTime: number) => void;
 export type DurationCallback = (duration: number) => void;
@@ -6,7 +5,6 @@ export type EndedCallback = () => void;
 export type ErrorCallback = (error: any) => void;
 export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
 export type PlaybackRateCallback = (rate: number) => void;
-export type PitchCallback = (pitch: number) => void;
 
 export class AudioPlayerEngine {
   private audio: HTMLAudioElement;
@@ -14,19 +12,14 @@ export class AudioPlayerEngine {
   private volumeState: number = 0.8;
   private isMutedState: boolean = false;
   private playbackRateState: number = 1.0;
-  private pitchSemitonesState: number = 0;
 
-  // A-B Looping State
   private loopAState: number | null = null;
   private loopBState: number | null = null;
   private isLoopActiveState: boolean = false;
 
-  // Web Audio API graph
-  private audioContext: AudioContext | null = null;
-  private mediaSourceNode: MediaElementAudioSourceNode | null = null;
-  private stretchNode: any | null = null;
-  private gainNode: GainNode | null = null;
-  private isWorkletRegistered: boolean = false;
+  private currentTimeState: number = 0;
+  private durationState: number = 0;
+  private currentSrc: string = '';
 
   private stateListeners: Set<PlayerStateCallback> = new Set();
   private timeListeners: Set<TimeUpdateCallback> = new Set();
@@ -35,56 +28,23 @@ export class AudioPlayerEngine {
   private errorListeners: Set<ErrorCallback> = new Set();
   private loopListeners: Set<LoopStateCallback> = new Set();
   private rateListeners: Set<PlaybackRateCallback> = new Set();
-  private pitchListeners: Set<PitchCallback> = new Set();
 
   constructor() {
     this.audio = new Audio();
-    this.audio.crossOrigin = 'anonymous';
-    // Default audio properties
     this.audio.volume = this.volumeState;
-    this.setAudioPreservesPitch();
     this.setupEventListeners();
   }
 
-  private async ensureAudioGraph() {
-    // DIAGNOSTIC BYPASS
-    return;
-  }
-
-  private updateGraphNodes() {
-    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
-  }
-
-  private setAudioPreservesPitch() {
-    const preserves = true; // For diagnostic test, set to true
-    if ('preservesPitch' in this.audio) {
-      (this.audio as any).preservesPitch = preserves;
-    }
-    if ('mozPreservesPitch' in this.audio) {
-      (this.audio as any).mozPreservesPitch = preserves;
-    }
-    if ('webkitPreservesPitch' in this.audio) {
-      (this.audio as any).webkitPreservesPitch = preserves;
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Event Listeners
+  // ---------------------------------------------------------------------------
 
   private setupEventListeners() {
-    this.audio.addEventListener('loadedmetadata', () => console.log('[AudioDebug] loadedmetadata'));
-    this.audio.addEventListener('canplay', () => console.log('[AudioDebug] canplay'));
-    this.audio.addEventListener('playing', () => console.log('[AudioDebug] playing'));
-    this.audio.addEventListener('stalled', () => console.log('[AudioDebug] stalled'));
-    this.audio.addEventListener('error', (e) => console.log('[AudioDebug] media error code:', (e.target as HTMLAudioElement).error?.code));
-
     this.audio.addEventListener('timeupdate', () => {
       const time = this.audio.currentTime || 0;
+      this.currentTimeState = time;
 
-      // Enforce A-B loop boundary if active
-      if (
-        this.isLoopActiveState &&
-        this.loopAState !== null &&
-        this.loopBState !== null &&
-        this.loopAState < this.loopBState
-      ) {
+      if (this.isLoopActiveState && this.loopAState !== null && this.loopBState !== null && this.loopAState < this.loopBState) {
         if (time >= this.loopBState || time < this.loopAState) {
           this.audio.currentTime = this.loopAState;
           this.timeListeners.forEach((cb) => cb(this.loopAState!));
@@ -98,7 +58,7 @@ export class AudioPlayerEngine {
     this.audio.addEventListener('durationchange', () => {
       const dur = this.audio.duration;
       if (dur && !isNaN(dur)) {
-        // Clamp loopB to duration if it exceeded
+        this.durationState = dur;
         if (this.loopBState !== null && this.loopBState > dur) {
           this.loopBState = dur;
           this.notifyLoopChange();
@@ -118,12 +78,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('ended', () => {
-      if (
-        this.isLoopActiveState &&
-        this.loopAState !== null &&
-        this.loopBState !== null &&
-        this.loopAState < this.loopBState
-      ) {
+      if (this.isLoopActiveState && this.loopAState !== null && this.loopBState !== null && this.loopAState < this.loopBState) {
         this.audio.currentTime = this.loopAState;
         this.play();
         return;
@@ -150,61 +105,41 @@ export class AudioPlayerEngine {
     );
   }
 
-  private printDebug(src: string) {
-    console.log('[AudioDebug] audioUrl present:', !!src);
-    console.log('[AudioDebug] media readyState:', this.audio.readyState);
-    console.log('[AudioDebug] AudioContext state:', this.audioContext?.state || 'none');
-    console.log('[AudioDebug] graph initialized:', !!this.mediaSourceNode);
-    console.log('[AudioDebug] Signalsmith initialized:', !!this.stretchNode);
-    console.log('[AudioDebug] media error code if present:', this.audio.error?.code || 'none');
-  }
+  // ---------------------------------------------------------------------------
+  // Public Playback Methods
+  // ---------------------------------------------------------------------------
 
   public async loadAndPlay(src: string, startTime: number = 0): Promise<void> {
-    // Reset loop when changing tracks
-    if (this.audio.src !== src) {
+    if (this.currentSrc !== src) {
       this.clearLoop();
+      this.currentSrc = src;
+      this.currentTimeState = startTime;
       this.audio.src = src;
-      this.audio.currentTime = startTime;
     }
 
-    this.audio.playbackRate = this.playbackRateState;
-    this.setAudioPreservesPitch();
-    
-    // Ensure the Web Audio graph is ready (requires user gesture, which this call likely stems from)
-    await this.ensureAudioGraph();
+    this.audio.pause();
+    this.isPlayingState = false;
 
-    this.printDebug(src);
-
-    try {
-      await this.audio.play();
-      console.log('[AudioDebug] audio.play resolved');
-      this.isPlayingState = true;
-      this.notifyStateChange();
-    } catch (err) {
-      console.log('[AudioDebug] audio.play rejected', err);
-      console.warn('Playback request interrupted or restricted by browser:', err);
-      this.isPlayingState = false;
-      this.notifyStateChange();
-    }
+    this.audio.currentTime = startTime;
+    await this.play();
   }
 
   public async play(): Promise<void> {
     if (!this.audio.src) return;
-    this.audio.playbackRate = this.playbackRateState;
-    this.setAudioPreservesPitch();
-    
-    await this.ensureAudioGraph();
 
-    this.printDebug(this.audio.src);
+    this.audio.playbackRate = this.playbackRateState;
+
+    // Preserve pitch when changing playback speed
+    if ('preservesPitch' in this.audio) {
+      (this.audio as any).preservesPitch = true;
+    }
+
+    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
 
     try {
       await this.audio.play();
-      console.log('[AudioDebug] audio.play resolved');
-      this.isPlayingState = true;
-      this.notifyStateChange();
     } catch (err) {
-      console.log('[AudioDebug] audio.play rejected', err);
-      console.warn('Playback error:', err);
+      console.warn('[Player] audio.play() error:', err);
     }
   }
 
@@ -212,10 +147,6 @@ export class AudioPlayerEngine {
     this.audio.pause();
     this.isPlayingState = false;
     this.notifyStateChange();
-    if (this.audioContext && this.audioContext.state === 'running') {
-      // Suspending context here could save power, but it's optional
-      // this.audioContext.suspend(); 
-    }
   }
 
   public togglePlay(): void {
@@ -228,20 +159,16 @@ export class AudioPlayerEngine {
 
   public seek(seconds: number): void {
     if (isNaN(seconds) || seconds < 0) return;
-    const dur = this.audio.duration || seconds;
+    const dur = this.getDuration() || seconds;
     let targetTime = Math.min(seconds, dur);
 
-    // If A-B loop is active and user seeks outside [loopA, loopB], re-align to loopA
-    if (
-      this.isLoopActiveState &&
-      this.loopAState !== null &&
-      this.loopBState !== null
-    ) {
+    if (this.isLoopActiveState && this.loopAState !== null && this.loopBState !== null) {
       if (targetTime < this.loopAState || targetTime > this.loopBState) {
         targetTime = this.loopAState;
       }
     }
 
+    this.currentTimeState = targetTime;
     this.audio.currentTime = targetTime;
     this.timeListeners.forEach((cb) => cb(targetTime));
   }
@@ -252,12 +179,12 @@ export class AudioPlayerEngine {
     if (clamped > 0 && this.isMutedState) {
       this.isMutedState = false;
     }
-    this.updateGraphNodes();
+    this.audio.volume = this.isMutedState ? 0 : clamped;
   }
 
   public setMuted(muted: boolean): void {
     this.isMutedState = muted;
-    this.updateGraphNodes();
+    this.audio.volume = muted ? 0 : this.volumeState;
   }
 
   public toggleMute(): void {
@@ -265,36 +192,23 @@ export class AudioPlayerEngine {
   }
 
   public setPlaybackRate(rate: number): void {
-    const clamped = Math.max(0.5, Math.min(2.0, rate));
+    const normalizedRate = Math.round((rate + Number.EPSILON) * 100) / 100;
+    const clamped = Math.max(0.5, Math.min(2.0, normalizedRate));
     this.playbackRateState = clamped;
     this.audio.playbackRate = clamped;
-    this.setAudioPreservesPitch();
-    this.updateGraphNodes();
     this.rateListeners.forEach((cb) => cb(clamped));
   }
 
   public getPlaybackRate(): number {
     return this.playbackRateState;
   }
-  
-  public setPitchSemitones(semitones: number): void {
-    // Limit between -12 and +12
-    const clamped = Math.max(-12, Math.min(12, Math.round(semitones)));
-    this.pitchSemitonesState = clamped;
-    this.updateGraphNodes();
-    this.pitchListeners.forEach((cb) => cb(clamped));
-  }
-  
-  public getPitchSemitones(): number {
-    return this.pitchSemitonesState;
-  }
 
   public getCurrentTime(): number {
-    return this.audio.currentTime || 0;
+    return this.currentTimeState;
   }
 
   public getDuration(): number {
-    return this.audio.duration || 0;
+    return this.durationState;
   }
 
   public getVolume(): number {
@@ -316,7 +230,6 @@ export class AudioPlayerEngine {
     let val = time !== undefined ? time : this.getCurrentTime();
     val = Math.max(0, Math.min(dur || val, val));
 
-    // Handle edge case: A set at or after B
     if (this.loopBState !== null && val >= this.loopBState) {
       this.loopBState = Math.min(dur || val + 5, val + 2);
     }
@@ -333,7 +246,6 @@ export class AudioPlayerEngine {
     }
     val = Math.max(0, val);
 
-    // Handle edge case: B set at or before A
     if (this.loopAState !== null && val <= this.loopAState) {
       this.loopAState = Math.max(0, val - 2);
     }
@@ -413,16 +325,10 @@ export class AudioPlayerEngine {
     this.rateListeners.add(cb);
     return () => this.rateListeners.delete(cb);
   }
-  
-  public onPitchChange(cb: PitchCallback): () => void {
-    this.pitchListeners.add(cb);
-    return () => this.pitchListeners.delete(cb);
-  }
 
   public getMediaElement(): HTMLAudioElement {
     return this.audio;
   }
 }
 
-// Export singleton instance of player engine
 export const playerEngine = new AudioPlayerEngine();

@@ -5,6 +5,7 @@ import { playerEngine } from '../services/playerEngine';
 interface PlayerContextType {
   currentTrack: Track | null;
   currentProject: Project | null;
+  updateCurrentProject: (project: Project) => void;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -14,7 +15,6 @@ interface PlayerContextType {
   loopB: number | null;
   isLoopActive: boolean;
   playbackRate: number;
-  pitchSemitones: number;
 
   manualQueue: Track[];
   isShuffle: boolean;
@@ -40,7 +40,9 @@ interface PlayerContextType {
   toggleLoopActive: () => void;
   clearLoop: () => void;
   setPlaybackRate: (rate: number) => void;
-  setPitchSemitones: (semitones: number) => void;
+
+  repeatMode: 'off' | 'all' | 'one';
+  toggleRepeat: () => void;
 
   isLoopEditorOpen: boolean;
   setIsLoopEditorOpen: (isOpen: boolean) => void;
@@ -51,9 +53,11 @@ const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 const generateShuffledContext = (project: Project, currentTrack: Track): Track[] => {
   if (!project.tracks) return [];
   const playable = project.tracks.filter(t => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample);
-  const idx = playable.findIndex(t => t.id === currentTrack.id);
-  const remaining = idx !== -1 ? playable.slice(idx + 1) : playable.filter(t => t.id !== currentTrack.id);
   
+  // Exclude current track
+  const remaining = playable.filter(t => t.id !== currentTrack.id);
+  
+  // Fisher-Yates shuffle
   for (let i = remaining.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
@@ -70,13 +74,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMutedState] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1.0);
-  const [pitchSemitones, setPitchSemitonesState] = useState(0);
 
   // Queue states
   const [manualQueue, setManualQueue] = useState<Track[]>([]);
   const [isShuffle, setIsShuffle] = useState(false);
   const [shuffledContext, setShuffledContext] = useState<Track[]>([]);
   const [history, setHistory] = useState<Track[]>([]);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
 
   // A-B Loop States
   const [loopA, setLoopAState] = useState<number | null>(null);
@@ -91,6 +95,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isShuffleRef = useRef<boolean>(false);
   const shuffledContextRef = useRef<Track[]>([]);
   const historyRef = useRef<Track[]>([]);
+  const repeatModeRef = useRef<'off' | 'all' | 'one'>('off');
 
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
@@ -98,9 +103,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
   useEffect(() => { shuffledContextRef.current = shuffledContext; }, [shuffledContext]);
   useEffect(() => { historyRef.current = history; }, [history]);
+  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
 
-  const advanceToNext = useCallback(() => {
+  const advanceToNext = useCallback((isManualSkip: boolean = false) => {
     const track = currentTrackRef.current;
+    
+    // Spotify behavior: Repeat One + manual skip = change to Repeat All and advance.
+    if (isManualSkip && repeatModeRef.current === 'one') {
+      setRepeatMode('all');
+      repeatModeRef.current = 'all'; // update ref immediately for this cycle
+    } else if (!isManualSkip && repeatModeRef.current === 'one' && track) {
+      // Natural end of track on Repeat One: seek to 0 and play again
+      setCurrentTime(0);
+      playerEngine.seek(0);
+      playerEngine.play();
+      return;
+    }
+
     if (track) {
       setHistory(prev => [...prev, track]);
     }
@@ -153,6 +172,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // End of queue/project
+    if (repeatModeRef.current === 'all' && proj) {
+      const playableTracks = proj.tracks.filter(
+        (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+      );
+      
+      if (playableTracks.length > 0) {
+        if (isShuffleRef.current) {
+          // New shuffle cycle
+          const startTrack = playableTracks[Math.floor(Math.random() * playableTracks.length)];
+          const newShuffled = generateShuffledContext(proj, startTrack);
+          setShuffledContext(newShuffled);
+          
+          setCurrentTrack(startTrack);
+          setDuration(startTrack.duration || 0);
+          setCurrentTime(0);
+          playerEngine.loadAndPlay(startTrack.audioUrl!);
+          return;
+        } else {
+          // Restart project from beginning
+          const startTrack = playableTracks[0];
+          setCurrentTrack(startTrack);
+          setDuration(startTrack.duration || 0);
+          setCurrentTime(0);
+          playerEngine.loadAndPlay(startTrack.audioUrl!);
+          return;
+        }
+      }
+    }
+
     setIsPlaying(false);
     setCurrentTime(0);
   }, []);
@@ -168,9 +216,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsLoopActiveState(active);
     });
     const unsubRate = playerEngine.onPlaybackRateChange(setPlaybackRateState);
-    const unsubPitch = playerEngine.onPitchChange(setPitchSemitonesState);
     const unsubEnded = playerEngine.onEnded(() => {
-      advanceToNext();
+      advanceToNext(false); // Natural end
     });
 
     return () => {
@@ -179,7 +226,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       unsubDuration();
       unsubLoop();
       unsubRate();
-      unsubPitch();
       unsubEnded();
     };
   }, [advanceToNext]);
@@ -213,6 +259,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playerEngine.loadAndPlay(track.audioUrl);
   }, []);
 
+  const updateCurrentProject = useCallback((project: Project) => {
+    if (currentProjectRef.current?.id === project.id) {
+      setCurrentProject(project);
+    }
+  }, []);
+
   const togglePlay = useCallback(() => {
     if (!currentTrackRef.current || !currentTrackRef.current.audioUrl || currentTrackRef.current.hasAudio === false) {
       return;
@@ -240,7 +292,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [isMuted]);
 
   const playNext = useCallback(() => {
-    advanceToNext();
+    advanceToNext(true); // Manual skip
   }, [advanceToNext]);
 
   const playPrevious = useCallback(() => {
@@ -319,19 +371,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isShuffle]);
 
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode(prev => {
+      if (prev === 'off') return 'all';
+      if (prev === 'all') return 'one';
+      return 'off';
+    });
+  }, []);
+
   // A-B Looping Callbacks
   const setLoopA = useCallback((time?: number) => playerEngine.setLoopA(time), []);
   const setLoopB = useCallback((time?: number) => playerEngine.setLoopB(time), []);
   const toggleLoopActive = useCallback(() => playerEngine.toggleLoopActive(), []);
   const clearLoop = useCallback(() => playerEngine.clearLoop(), []);
   const setPlaybackRate = useCallback((rate: number) => playerEngine.setPlaybackRate(rate), []);
-  const setPitchSemitones = useCallback((semitones: number) => playerEngine.setPitchSemitones(semitones), []);
 
   return (
     <PlayerContext.Provider
       value={{
         currentTrack,
         currentProject,
+        updateCurrentProject,
         isPlaying,
         currentTime,
         duration: duration || (currentTrack?.duration ?? 0),
@@ -341,12 +401,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loopB,
         isLoopActive,
         playbackRate,
-        pitchSemitones,
-        
+
         manualQueue,
         isShuffle,
         shuffledContext,
         history,
+        repeatMode,
 
         playTrack,
         togglePlay,
@@ -361,14 +421,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         removeFromQueue,
         reorderQueue,
         toggleShuffle,
+        toggleRepeat,
 
         setLoopA,
         setLoopB,
         toggleLoopActive,
         clearLoop,
         setPlaybackRate,
-        setPitchSemitones,
-        
+
         isLoopEditorOpen,
         setIsLoopEditorOpen,
       }}

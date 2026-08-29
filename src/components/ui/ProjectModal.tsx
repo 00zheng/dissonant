@@ -57,7 +57,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
     const projectData: Partial<Project> = {
       title: title.trim(),
-      artist: artist.trim() || 'Unknown Artist',
+      artist: artist.trim() || '',
       category,
       folderId: folderId || undefined,
       tags: parsedTags,

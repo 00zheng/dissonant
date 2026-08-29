@@ -59,7 +59,7 @@ export const LoopEditor: React.FC = () => {
       wsRegions.addRegion({
         start,
         end,
-        color: 'rgba(255, 59, 0, 0.3)',
+        color: 'rgba(250, 204, 21, 0.3)', // Yellow #FACC15
         drag: true,
         resize: true,
         id: 'ab-loop',
@@ -70,9 +70,7 @@ export const LoopEditor: React.FC = () => {
       if (region.id === 'ab-loop') {
         setLoopA(region.start);
         setLoopB(region.end);
-        if (!isLoopActive) {
-          toggleLoopActive();
-        }
+        // Do NOT automatically activate the loop
       }
     });
 
@@ -82,10 +80,29 @@ export const LoopEditor: React.FC = () => {
     };
   }, [isLoopEditorOpen, currentTrack?.audioUrl]);
 
+  const handleReset = () => {
+    if (!wavesurferRef.current || !regionsRef.current) return;
+    const duration = wavesurferRef.current.getDuration() || 0;
+    
+    // reset region visually
+    const regions = regionsRef.current.getRegions();
+    const abRegion = regions.find(r => r.id === 'ab-loop');
+    if (abRegion) {
+      abRegion.setOptions({ start: 0, end: duration });
+    }
+    
+    // reset in context
+    setLoopA(0);
+    setLoopB(duration);
+    if (isLoopActive) {
+      toggleLoopActive();
+    }
+  };
+
   if (!isLoopEditorOpen || !currentTrack) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-sm flex flex-col justify-center items-center select-none overflow-hidden touch-none p-4 md:p-10">
+    <div className="fixed inset-0 z-[150] bg-[#000000]/90 backdrop-blur-sm flex flex-col justify-center items-center select-none overflow-hidden touch-none p-4 md:p-10">
       <div className="absolute top-6 right-6">
         <button
           onClick={() => setIsLoopEditorOpen(false)}
@@ -115,7 +132,7 @@ export const LoopEditor: React.FC = () => {
               )}
             </button>
             <button
-              onClick={clearLoop}
+              onClick={handleReset}
               className="px-3 h-10 rounded-[4px] bg-transparent hover:bg-[#2A2A2A] text-[#E8BDB3] flex items-center gap-2 transition-colors cursor-pointer text-sm font-semibold"
             >
               <RotateCcw className="w-4 h-4" />
@@ -137,7 +154,7 @@ export const LoopEditor: React.FC = () => {
 
         <div className="flex justify-between items-center mt-6 text-sm font-mono text-[#E8BDB3]">
           <div className="flex items-center gap-3">
-            <span className="text-[#FF3B00] font-bold">A:</span>
+            <span className="text-[#FACC15] font-bold">A:</span>
             <span className="bg-[#1C1B1B] px-2 py-1 rounded-[4px] min-w-[70px] text-center border border-[#282828]">
               {loopA !== null ? loopA.toFixed(2) : '--.--'}s
             </span>
@@ -145,13 +162,13 @@ export const LoopEditor: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={toggleLoopActive}
-              className={`px-3 py-1.5 rounded-[4px] border transition-colors cursor-pointer ${isLoopActive ? 'bg-[#FF3B00] border-[#FF3B00] text-white' : 'bg-transparent border-[#282828] text-[#E8BDB3]/50 hover:text-white hover:bg-[#2A2A2A]'}`}
+              className={`px-3 py-1.5 rounded-[4px] border transition-colors cursor-pointer font-bold ${isLoopActive ? 'bg-[#FACC15] border-[#FACC15] text-black' : 'bg-transparent border-[#282828] text-[#E8BDB3]/50 hover:text-white hover:bg-[#2A2A2A]'}`}
             >
-              {isLoopActive ? 'LOOP ACTIVE' : 'LOOP INACTIVE'}
+              {isLoopActive ? 'LOOP ACTIVE' : 'ACTIVATE LOOP'}
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[#FF3B00] font-bold">B:</span>
+            <span className="text-[#FACC15] font-bold">B:</span>
             <span className="bg-[#1C1B1B] px-2 py-1 rounded-[4px] min-w-[70px] text-center border border-[#282828]">
               {loopB !== null ? loopB.toFixed(2) : '--.--'}s
             </span>

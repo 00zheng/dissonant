@@ -139,17 +139,8 @@ export const TrackList: React.FC<TrackListProps> = ({
                   )}
                 </div>
 
-                {/* Track Cover Thumbnail */}
-                <div className="w-9 h-9 rounded-[4px] bg-[#131313] border border-[#282828] overflow-hidden shrink-0">
-                  <img
-                    src={track.coverUrl || project?.coverUrl}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
                 {/* Title & Metadata */}
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 ml-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <p
                       className={clsx(
@@ -292,9 +283,6 @@ export const TrackList: React.FC<TrackListProps> = ({
                   {/* Title & Optional Secondary Info */}
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-[4px] bg-[#131313] border border-[#282828] overflow-hidden shrink-0">
-                        <img src={track.coverUrl || project?.coverUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className={clsx('font-medium text-[#E5E2E1]', hasRealAudio && 'group-hover:text-white', isSelected && 'text-[#FF3B00]')}>

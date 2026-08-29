@@ -93,21 +93,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       className={clsx(
-        'relative w-full cursor-pointer py-2 group flex items-center select-none',
+        'relative w-full cursor-pointer h-4 flex items-center group select-none',
         className
       )}
     >
       {/* Background Track */}
       <div className="w-full bg-[#1A1A1A] rounded-full overflow-hidden relative" style={{ height: `${height}px` }}>
         {/* A-B Loop Region Highlight */}
-        {hasLoopRegion && (
+        {isLoopActive && hasLoopRegion && (
           <div
-            className={clsx(
-              'absolute top-0 bottom-0 transition-all',
-              isLoopActive
-                ? 'bg-[#FF3B00]/40 border-x border-[#FF3B00]'
-                : 'bg-white/20 border-x border-white/40'
-            )}
+            className="absolute top-0 bottom-0 bg-[#FACC15]/20 transition-all pointer-events-none"
             style={{
               left: `${Math.max(0, loopAStartPct)}%`,
               width: `${Math.min(100 - loopAStartPct, loopBEndPct - loopAStartPct)}%`,
@@ -123,19 +118,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       </div>
 
       {/* A & B Pin Markers */}
-      {hasLoopRegion && (
+      {isLoopActive && hasLoopRegion && (
         <>
           <div
-            className="absolute top-1 text-[9px] font-bold font-mono text-[#FF3B00] -translate-x-1/2 pointer-events-none"
+            className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3 bg-[#FACC15] pointer-events-none z-10 -translate-x-[1px]"
             style={{ left: `${Math.max(0, loopAStartPct)}%` }}
           >
-            A
+            <div className="absolute bottom-full mb-0.5 text-[9px] sm:text-[10px] font-bold text-[#FACC15] -translate-x-1/2 left-[1px]">
+              A
+            </div>
           </div>
           <div
-            className="absolute top-1 text-[9px] font-bold font-mono text-[#FF3B00] -translate-x-1/2 pointer-events-none"
+            className="absolute top-1/2 -translate-y-1/2 w-[2px] h-3 bg-[#FACC15] pointer-events-none z-10 -translate-x-[1px]"
             style={{ left: `${Math.min(100, loopBEndPct)}%` }}
           >
-            B
+            <div className="absolute bottom-full mb-0.5 text-[9px] sm:text-[10px] font-bold text-[#FACC15] -translate-x-1/2 left-[1px]">
+              B
+            </div>
           </div>
         </>
       )}

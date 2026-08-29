@@ -87,7 +87,6 @@ export async function processAudioUpload(
     durationFormatted,
     audioUrl: localBlobUrl,
     storagePath,
-    coverUrl: projectCoverUrl,
     hasAudio: true,
     isSample: false,
   };

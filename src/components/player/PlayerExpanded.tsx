@@ -35,10 +35,9 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
     clearLoop,
     playbackRate,
     setPlaybackRate,
-    pitchSemitones,
-    setPitchSemitones,
     isShuffle,
     toggleShuffle,
+    setIsLoopEditorOpen,
   } = usePlayer();
 
   // Close on Escape key press
@@ -65,7 +64,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
   const loopAPct = duration && loopA !== null ? (loopA / duration) * 100 : undefined;
   const loopBPct = duration && loopB !== null ? (loopB / duration) * 100 : undefined;
 
-  const coverSrc = currentTrack.coverUrl || currentProject?.coverUrl || NEUTRAL_COVER_FALLBACK;
+  const coverSrc = currentProject?.coverUrl || currentTrack.coverUrl || NEUTRAL_COVER_FALLBACK;
   const displayArtist = currentTrack.artist || currentProject?.artist;
   const hasVersion = Boolean(currentTrack.versionTag && currentTrack.versionTag.trim());
   const hasKey = Boolean(currentTrack.key && currentTrack.key.trim() && currentTrack.key !== 'undefined');
@@ -136,6 +135,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
             <ProgressBar
               value={progressPercent}
               onChange={(pct) => seek((pct / 100) * duration)}
+              onScrub={(pct) => seek((pct / 100) * duration)}
               height={4}
               loopAStartPct={loopAPct}
               loopBEndPct={loopBPct}
@@ -155,119 +155,59 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
                 <span>Playback Speed</span>
               </div>
               <span className="text-xs font-mono font-bold text-[#FF3B00]">
-                {playbackRate}x
+                {playbackRate.toFixed(2).replace(/\.?0+$/, '')}x
               </span>
-            </div>
-
-            <div className="grid grid-cols-6 gap-1.5 text-xs font-mono">
-              {SPEED_PRESETS.map((rate) => (
-                <button
-                  key={rate}
-                  onClick={() => setPlaybackRate(rate)}
-                  className={`py-1.5 rounded-[4px] border transition-colors cursor-pointer text-center ${
-                    playbackRate === rate
-                      ? 'bg-[#FF3B00] border-[#FF3B00] text-white font-bold'
-                      : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
-                  }`}
-                >
-                  {rate}x
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Pitch Control Panel */}
-          <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
-                <span className="text-[#FF3B00] font-bold">♪</span>
-                <span>Pitch (Semitones)</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono font-bold text-[#FF3B00]">
-                  {pitchSemitones > 0 ? `+${pitchSemitones}` : pitchSemitones} semi
-                </span>
-                {pitchSemitones !== 0 && (
-                  <button
-                    onClick={() => setPitchSemitones(0)}
-                    className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-[3px] bg-[#2A2A2A] text-[#E8BDB3]/70 hover:text-white border border-[#282828] transition-colors cursor-pointer"
-                  >
-                    Reset
-                  </button>
-                )}
-              </div>
             </div>
 
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-xs font-mono text-[#E8BDB3]/40">-12</span>
+              <button
+                onClick={() => setPlaybackRate(Math.max(0.5, playbackRate - 0.05))}
+                className="w-8 h-8 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white transition-colors cursor-pointer flex items-center justify-center font-bold"
+              >
+                -
+              </button>
               <input
                 type="range"
-                min="-12"
-                max="12"
-                step="1"
-                value={pitchSemitones}
-                onChange={(e) => setPitchSemitones(parseInt(e.target.value, 10))}
+                min="0.5"
+                max="2.0"
+                step="0.05"
+                value={playbackRate}
+                onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
                 className="flex-1 h-1.5 bg-[#1C1B1B] rounded-full appearance-none cursor-pointer border border-[#282828] accent-[#FF3B00]"
               />
-              <span className="text-xs font-mono text-[#E8BDB3]/40">+12</span>
+              <button
+                onClick={() => setPlaybackRate(Math.min(2.0, playbackRate + 0.05))}
+                className="w-8 h-8 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white transition-colors cursor-pointer flex items-center justify-center font-bold"
+              >
+                +
+              </button>
             </div>
+            {playbackRate !== 1.0 && (
+              <div className="flex justify-end mt-1">
+                <button
+                  onClick={() => setPlaybackRate(1.0)}
+                  className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-[3px] bg-[#2A2A2A] text-[#E8BDB3]/70 hover:text-white border border-[#282828] transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* A-B Section Looping Control Panel */}
-          <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
-                A-B Section Looping
-              </span>
-              {isLoopActive && (
-                <span className="px-2 py-0.5 rounded-[3px] bg-[#FF3B00] text-white text-[10px] uppercase font-bold tracking-wider animate-pulse">
-                  Loop Active
-                </span>
-              )}
-            </div>
 
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              <button
-                onClick={() => setLoopA()}
-                className={`py-2 px-2 sm:px-3 rounded-[4px] border font-mono transition-colors cursor-pointer text-center truncate ${
-                  loopA !== null
-                    ? 'bg-[#FF3B00]/20 border-[#FF3B00] text-[#FF3B00] font-bold'
-                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
-                }`}
-              >
-                Set A {loopA !== null ? `(${formatTime(loopA)})` : ''}
-              </button>
-
-              <button
-                onClick={() => setLoopB()}
-                className={`py-2 px-2 sm:px-3 rounded-[4px] border font-mono transition-colors cursor-pointer text-center truncate ${
-                  loopB !== null
-                    ? 'bg-[#FF3B00]/20 border-[#FF3B00] text-[#FF3B00] font-bold'
-                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
-                }`}
-              >
-                Set B {loopB !== null ? `(${formatTime(loopB)})` : ''}
-              </button>
-
-              <button
-                onClick={toggleLoopActive}
-                className={`py-2 px-2 sm:px-3 rounded-[4px] border font-semibold transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
-                  isLoopActive
-                    ? 'bg-[#FF3B00] border-[#FF3B00] text-white'
-                    : 'bg-[#1C1B1B] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
-                }`}
-              >
-                <Repeat className="w-3.5 h-3.5" />
-                <span>{isLoopActive ? 'Loop ON' : 'Loop OFF'}</span>
-              </button>
-
-              <button
-                onClick={clearLoop}
-                className="py-2 px-2 sm:px-3 rounded-[4px] bg-[#1C1B1B] border border-[#282828] text-[#E8BDB3]/70 hover:text-white hover:border-[#5E3F38] transition-colors cursor-pointer text-center"
-              >
-                Clear
-              </button>
-            </div>
+          {/* Loop Control */}
+          <div className="flex items-center justify-center py-2">
+            <button
+              onClick={() => setIsLoopEditorOpen(true)}
+              className={`px-8 py-3 rounded-[6px] border font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2 ${
+                isLoopActive
+                  ? 'bg-[#FF3B00] border-[#FF3B00] text-white'
+                  : 'bg-[#131313] border-[#282828] text-[#E5E2E1] hover:border-[#353534]'
+              }`}
+            >
+              <Repeat className="w-5 h-5" />
+              <span>Loop</span>
+            </button>
           </div>
 
           {/* Primary Playback Controls */}
@@ -336,7 +276,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
       {/* Footer Meta */}
       <div className="flex items-center justify-between font-mono text-xs text-[#E8BDB3]/40 border-t border-[#282828] pt-4 max-w-4xl mx-auto w-full shrink-0">
         <span>PROJECT: {currentProject?.title || 'STANDALONE TRACK'}</span>
-        <span>RATE: {playbackRate}x | PITCH: {pitchSemitones > 0 ? `+${pitchSemitones}` : pitchSemitones}</span>
+        <span>RATE: {playbackRate.toFixed(2).replace(/\.?0+$/, '')}x</span>
       </div>
     </div>
   );
