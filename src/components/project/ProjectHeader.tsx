@@ -40,6 +40,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const isPlayingThisProject = currentProject?.id === project.id && isPlaying;
   const [showMenu, setShowMenu] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const hasCustomCover = Boolean(
@@ -74,11 +75,30 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && onChangeCover) {
       const file = e.target.files[0];
+      setCoverError(null);
+
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const fileExt = (file.name.split('.').pop() || '').toLowerCase();
+      const isValidType = validTypes.includes(file.type) || ['jpg', 'jpeg', 'png', 'webp'].includes(fileExt);
+
+      if (!isValidType) {
+        setCoverError('Please select a valid image file (JPEG, PNG, or WebP).');
+        if (coverInputRef.current) coverInputRef.current.value = '';
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        setCoverError('Cover image exceeds maximum file size (10 MB).');
+        if (coverInputRef.current) coverInputRef.current.value = '';
+        return;
+      }
+
       try {
         setIsUploadingCover(true);
         await onChangeCover(project, file);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to change cover:', err);
+        setCoverError(err?.message || 'Failed to upload cover image. Please try again.');
       } finally {
         setIsUploadingCover(false);
         if (coverInputRef.current) coverInputRef.current.value = '';
@@ -88,6 +108,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   const handleTriggerCoverUpload = () => {
     if (isUploadingCover) return;
+    setCoverError(null);
     coverInputRef.current?.click();
   };
 
@@ -96,9 +117,11 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
     try {
       setIsUploadingCover(true);
       setShowMenu(false);
+      setCoverError(null);
       await onRemoveCover(project);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to remove cover:', err);
+      setCoverError(err?.message || 'Failed to remove cover. Please try again.');
     } finally {
       setIsUploadingCover(false);
     }
@@ -114,6 +137,18 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
       />
+
+      {coverError && (
+        <div className="max-w-7xl mx-auto mb-4 bg-red-950/60 border border-red-800/80 rounded-[6px] p-3 text-xs text-red-200 flex items-center justify-between gap-3 animate-in fade-in duration-150">
+          <span>{coverError}</span>
+          <button
+            onClick={() => setCoverError(null)}
+            className="text-red-400 hover:text-white text-sm cursor-pointer p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-center sm:items-end max-w-7xl mx-auto text-center sm:text-left">
         {/* Cover Art Container with Change Cover Overlay */}

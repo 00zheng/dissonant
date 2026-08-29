@@ -384,35 +384,70 @@ export const AppContent: React.FC = () => {
       openAuth('signin');
       return;
     }
-    // Delete old storage cover if exists
-    if (project.coverStoragePath) {
-      await fsDeleteCoverImage(project.coverStoragePath);
-    }
+    console.log(`[CoverDebug] selected file: ${file.name}`);
+    console.log(`[CoverDebug] type / size: ${file.type || 'unknown'} / ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`[CoverDebug] userId: ${user.uid}`);
+    console.log(`[CoverDebug] projectId: ${project.id}`);
+
+    const oldCoverStoragePath = project.coverStoragePath;
+
+    console.log(`[CoverDebug] upload started`);
     const { task, storagePath } = fsUploadCoverImage(user.uid, project.id, file);
+    console.log(`[CoverDebug] storagePath: ${storagePath}`);
+
     const snapshot = await task;
+    console.log(`[CoverDebug] upload completed`);
+
     const downloadUrl = await getDownloadURL(snapshot.ref);
+    console.log(`[CoverDebug] download URL resolved: ${downloadUrl}`);
 
     const updatedProject: Project = {
       ...project,
       coverUrl: downloadUrl,
       coverStoragePath: storagePath,
     };
+
     await fsSaveProject(user.uid, updatedProject);
+    console.log(`[CoverDebug] Firestore updated`);
+
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    console.log(`[CoverDebug] local project state updated`);
+
+    // Safely delete old storage object only after successful commit of the new one
+    if (oldCoverStoragePath && oldCoverStoragePath !== storagePath) {
+      try {
+        await fsDeleteCoverImage(oldCoverStoragePath);
+        console.log(`[CoverDebug] Old cover removed from storage: ${oldCoverStoragePath}`);
+      } catch (err) {
+        console.warn(`[CoverDebug] Failed to delete old cover image:`, err);
+      }
+    }
   };
 
   const handleRemoveCover = async (project: Project) => {
     if (!user) return;
-    if (project.coverStoragePath) {
-      await fsDeleteCoverImage(project.coverStoragePath);
-    }
+    const oldCoverStoragePath = project.coverStoragePath;
+
     const updatedProject: Project = {
       ...project,
-      coverUrl: NEUTRAL_COVER_FALLBACK,
+      coverUrl: '',
       coverStoragePath: undefined,
     };
+
     await fsSaveProject(user.uid, updatedProject);
+    console.log(`[CoverDebug] Cover removed in Firestore`);
+
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    console.log(`[CoverDebug] local project state updated`);
+
+    if (oldCoverStoragePath) {
+      try {
+        await fsDeleteCoverImage(oldCoverStoragePath);
+        console.log(`[CoverDebug] Storage object deleted: ${oldCoverStoragePath}`);
+      } catch (err) {
+        console.warn(`[CoverDebug] Failed to delete storage cover:`, err);
+      }
+    }
   };
 
   // --- Deletion Handler ---

@@ -558,11 +558,17 @@ export function fsUploadAudioFile(userId: string, trackId: string, file: File): 
 }
 
 export function fsUploadCoverImage(userId: string, projectId: string, file: File): { task: UploadTask, storagePath: string } {
-  const fileExt = file.name.split('.').pop() || 'jpg';
-  const fileName = `cover_${Date.now()}.${fileExt}`;
+  const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  let contentType = file.type;
+  if (!contentType || !['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+    if (fileExt === 'png') contentType = 'image/png';
+    else if (fileExt === 'webp') contentType = 'image/webp';
+    else contentType = 'image/jpeg';
+  }
+  const fileName = `cover_${Date.now()}.${fileExt === 'jpeg' ? 'jpg' : fileExt}`;
   const storagePath = `users/${userId}/covers/${projectId}/${fileName}`;
   const fileRef = ref(storage, storagePath);
-  const task = uploadBytesResumable(fileRef, file, { contentType: file.type || 'image/jpeg' });
+  const task = uploadBytesResumable(fileRef, file, { contentType });
   return { task, storagePath };
 }
 

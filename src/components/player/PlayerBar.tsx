@@ -5,6 +5,7 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { QueuePanel } from './QueuePanel';
 import { LoopEditor } from './LoopEditor';
 import { PlayerExpanded } from './PlayerExpanded';
+import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
 
 const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -91,7 +92,7 @@ export const PlayerBar: React.FC = () => {
         >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-[4px] bg-[#1C1B1B] border border-[#282828] overflow-hidden shrink-0 group-hover:border-[#5E3F38] transition-colors">
             <img
-              src={currentTrack.coverUrl || currentProject?.coverUrl}
+              src={currentTrack.coverUrl || currentProject?.coverUrl || NEUTRAL_COVER_FALLBACK}
               alt={currentTrack.title}
               className="w-full h-full object-cover"
             />

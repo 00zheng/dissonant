@@ -47,69 +47,16 @@ export class AudioPlayerEngine {
   }
 
   private async ensureAudioGraph() {
-    if (!this.audioContext) {
-      this.audioContext = new AudioContext();
-    }
-    
-    if (this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-    }
-
-    if (!this.stretchNode) {
-      try {
-        this.mediaSourceNode = this.audioContext.createMediaElementSource(this.audio);
-        this.stretchNode = await SignalsmithStretch(this.audioContext, { outputChannelCount: [2] });
-        this.gainNode = this.audioContext.createGain();
-
-        // Connect graph: AudioElement -> SignalsmithStretch -> Gain -> Destination
-        this.mediaSourceNode.connect(this.stretchNode);
-        this.stretchNode.connect(this.gainNode);
-        this.gainNode.connect(this.audioContext.destination);
-
-        // Required to start processing
-        this.stretchNode.start();
-        this.isWorkletRegistered = true;
-
-        // Apply current states
-        this.updateGraphNodes();
-      } catch (err) {
-        console.error('Failed to create audio graph:', err);
-      }
-    }
+    // DIAGNOSTIC BYPASS
+    return;
   }
 
   private updateGraphNodes() {
-    if (this.stretchNode) {
-      // Calculate independent pitch shift based on current playback speed.
-      // Since <audio> element handles the speed (playbackRate), it shifts pitch by 12*log2(rate).
-      // The SignalsmithStretch node counteracts this so the final pitch matches the requested semitones.
-      const speedPitchShift = 12 * Math.log2(this.playbackRateState);
-      const requiredShift = this.pitchSemitonesState - speedPitchShift;
-      
-      this.stretchNode.schedule({ 
-        semitones: requiredShift,
-        formantCompensation: false
-      });
-    }
-    
-    if (this.gainNode && this.audioContext) {
-      const now = this.audioContext.currentTime;
-      const targetVolume = this.isMutedState ? 0 : this.volumeState;
-      this.gainNode.gain.setTargetAtTime(targetVolume, now, 0.05);
-      
-      // When graph is active, standard audio element volume is bypassed in favor of gain node,
-      // but some browsers still respect it, so we can mute the source element or leave it max.
-      // Usually, createMediaElementSource "redirects" the audio so the source becomes silent
-      // on the regular output.
-    } else {
-      // Fallback
-      this.audio.volume = this.isMutedState ? 0 : this.volumeState;
-    }
+    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
   }
 
   private setAudioPreservesPitch() {
-    // Disable native browser pitch correction so SoundTouch handles it cleanly
-    const preserves = false;
+    const preserves = true; // For diagnostic test, set to true
     if ('preservesPitch' in this.audio) {
       (this.audio as any).preservesPitch = preserves;
     }
@@ -122,6 +69,12 @@ export class AudioPlayerEngine {
   }
 
   private setupEventListeners() {
+    this.audio.addEventListener('loadedmetadata', () => console.log('[AudioDebug] loadedmetadata'));
+    this.audio.addEventListener('canplay', () => console.log('[AudioDebug] canplay'));
+    this.audio.addEventListener('playing', () => console.log('[AudioDebug] playing'));
+    this.audio.addEventListener('stalled', () => console.log('[AudioDebug] stalled'));
+    this.audio.addEventListener('error', (e) => console.log('[AudioDebug] media error code:', (e.target as HTMLAudioElement).error?.code));
+
     this.audio.addEventListener('timeupdate', () => {
       const time = this.audio.currentTime || 0;
 
@@ -197,6 +150,15 @@ export class AudioPlayerEngine {
     );
   }
 
+  private printDebug(src: string) {
+    console.log('[AudioDebug] audioUrl present:', !!src);
+    console.log('[AudioDebug] media readyState:', this.audio.readyState);
+    console.log('[AudioDebug] AudioContext state:', this.audioContext?.state || 'none');
+    console.log('[AudioDebug] graph initialized:', !!this.mediaSourceNode);
+    console.log('[AudioDebug] Signalsmith initialized:', !!this.stretchNode);
+    console.log('[AudioDebug] media error code if present:', this.audio.error?.code || 'none');
+  }
+
   public async loadAndPlay(src: string, startTime: number = 0): Promise<void> {
     // Reset loop when changing tracks
     if (this.audio.src !== src) {
@@ -211,11 +173,15 @@ export class AudioPlayerEngine {
     // Ensure the Web Audio graph is ready (requires user gesture, which this call likely stems from)
     await this.ensureAudioGraph();
 
+    this.printDebug(src);
+
     try {
       await this.audio.play();
+      console.log('[AudioDebug] audio.play resolved');
       this.isPlayingState = true;
       this.notifyStateChange();
     } catch (err) {
+      console.log('[AudioDebug] audio.play rejected', err);
       console.warn('Playback request interrupted or restricted by browser:', err);
       this.isPlayingState = false;
       this.notifyStateChange();
@@ -229,11 +195,15 @@ export class AudioPlayerEngine {
     
     await this.ensureAudioGraph();
 
+    this.printDebug(this.audio.src);
+
     try {
       await this.audio.play();
+      console.log('[AudioDebug] audio.play resolved');
       this.isPlayingState = true;
       this.notifyStateChange();
     } catch (err) {
+      console.log('[AudioDebug] audio.play rejected', err);
       console.warn('Playback error:', err);
     }
   }
