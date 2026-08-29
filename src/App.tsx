@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, MotionConfig } from 'motion/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
@@ -88,6 +88,7 @@ export const AppContent: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname));
   const [searchQuery, setSearchQuery] = useState('');
+  const reorderVersionRef = useRef(0);
 
   // Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -376,14 +377,34 @@ export const AppContent: React.FC = () => {
   const handleReorderTracks = async (reorderedTracks: Track[]) => {
     if (!user || !selectedProject) return;
 
+    reorderVersionRef.current += 1;
+    const version = reorderVersionRef.current;
+    const previousTracks = selectedProject.tracks || [];
+
     const updatedProject: Project = {
       ...selectedProject,
       tracks: reorderedTracks,
     };
 
-    await fsReorderTracks(user.uid, reorderedTracks);
+    // Optimistic UI update BEFORE async persistence
     setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
     updateCurrentProject(updatedProject);
+
+    try {
+      await fsReorderTracks(user.uid, reorderedTracks);
+    } catch (error) {
+      console.error("Failed to persist reordered tracks:", error);
+
+      // Rollback only if no newer reorder has happened
+      if (version === reorderVersionRef.current) {
+        const rollbackProject: Project = {
+          ...selectedProject,
+          tracks: previousTracks,
+        };
+        setProjects((prev) => prev.map((p) => (p.id === rollbackProject.id ? rollbackProject : p)));
+        updateCurrentProject(rollbackProject);
+      }
+    }
   };
 
   // --- Cover Art Handlers ---

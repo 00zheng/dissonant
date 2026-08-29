@@ -12,6 +12,8 @@ import {
   iconCrossfadeVariants,
 } from '../../constants/motion';
 
+const waveformCache = new Map<string, { peaks: Array<number[]>; duration: number }>();
+
 export const LoopEditor: React.FC = () => {
   const {
     currentTrack,
@@ -32,6 +34,9 @@ export const LoopEditor: React.FC = () => {
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const regionsRef = useRef<RegionsPlugin | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<string>('Analyzing Waveform...');
+  const [isError, setIsError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Close on Escape key press
   useEffect(() => {
@@ -47,6 +52,21 @@ export const LoopEditor: React.FC = () => {
   useEffect(() => {
     if (!isLoopEditorOpen || !containerRef.current || !currentTrack?.audioUrl) return;
 
+    const cached = waveformCache.get(currentTrack.id);
+    let peaks: Array<number[]> | undefined = undefined;
+    let duration: number | undefined = undefined;
+
+    if (cached) {
+      peaks = cached.peaks;
+      duration = cached.duration;
+    }
+
+    const t0 = performance.now();
+    console.log(`[Waveform] editor opened for track ${currentTrack.id}`);
+    setLoadingStatus(cached ? 'Loading from cache...' : 'Initializing...');
+    setIsError(false);
+    setIsReady(false);
+
     const ws = WaveSurfer.create({
       container: containerRef.current,
       waveColor: '#FF562D',
@@ -58,6 +78,8 @@ export const LoopEditor: React.FC = () => {
       height: 200,
       normalize: true,
       media: playerEngine.getMediaElement(),
+      peaks,
+      duration,
     });
 
     const wsRegions = ws.registerPlugin(RegionsPlugin.create());
@@ -65,12 +87,52 @@ export const LoopEditor: React.FC = () => {
     wavesurferRef.current = ws;
     regionsRef.current = wsRegions;
 
+    ws.on('load', () => {
+      console.log(`[Waveform] load started — ${Math.round(performance.now() - t0)}ms`);
+      setLoadingStatus('Loading...');
+    });
+    
+    ws.on('loading', (percent) => {
+      console.log(`[Waveform] loading ${percent}% — ${Math.round(performance.now() - t0)}ms`);
+      setLoadingStatus(`Loading waveform... ${percent}%`);
+    });
+
+    ws.on('decode', () => {
+      console.log(`[Waveform] decode started — ${Math.round(performance.now() - t0)}ms`);
+      setLoadingStatus('Decoding waveform...');
+    });
+
+    ws.on('error', (err) => {
+      console.error(`[Waveform] ERROR —`, err);
+      setIsError(true);
+      setLoadingStatus('Could not load waveform.');
+    });
+
+    let timeoutId = setTimeout(() => {
+      setIsError(true);
+      setLoadingStatus('Waveform is taking longer than expected.');
+    }, 15000);
+
     ws.on('ready', () => {
+      clearTimeout(timeoutId);
+      const tReady = performance.now();
+      console.log(`[Waveform] ready — ${Math.round(tReady - t0)}ms`);
       setIsReady(true);
+
+      if (!cached && currentTrack) {
+        try {
+          const exportedPeaks = ws.exportPeaks({ maxLength: 8000 });
+          const exportedDuration = ws.getDuration();
+          waveformCache.set(currentTrack.id, { peaks: exportedPeaks, duration: exportedDuration });
+          console.log(`[Waveform] cached peaks for track ${currentTrack.id}`);
+        } catch (err) {
+          console.error('[Waveform] Could not export peaks', err);
+        }
+      }
       
-      const duration = ws.getDuration();
+      const audioDuration = ws.getDuration();
       const start = loopA !== null ? loopA : 0;
-      const end = loopB !== null ? loopB : duration || 10;
+      const end = loopB !== null ? loopB : audioDuration || 10;
       
       wsRegions.clearRegions();
       wsRegions.addRegion({
@@ -92,10 +154,11 @@ export const LoopEditor: React.FC = () => {
     });
 
     return () => {
+      clearTimeout(timeoutId);
       ws.destroy();
       setIsReady(false);
     };
-  }, [isLoopEditorOpen, currentTrack?.audioUrl]);
+  }, [isLoopEditorOpen, currentTrack?.audioUrl, currentTrack?.id, retryCount]);
 
   const handleReset = () => {
     if (!wavesurferRef.current || !regionsRef.current) return;
@@ -200,10 +263,22 @@ export const LoopEditor: React.FC = () => {
 
             <div className="relative w-full rounded-[4px] bg-[#131313] border border-[#282828] p-4 flex flex-col">
               {!isReady && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#131313] rounded-[4px]">
-                  <div className="animate-pulse flex items-center gap-2 text-[#FF3B00] font-mono text-sm">
-                    <ShieldCheck className="w-4 h-4" /> Analyzing Waveform...
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#131313] rounded-[4px] space-y-3">
+                  <div className={`flex items-center gap-2 font-mono text-sm ${isError ? 'text-red-500' : 'text-[#FF3B00] animate-pulse'}`}>
+                    <ShieldCheck className="w-4 h-4" /> {loadingStatus}
                   </div>
+                  {isError && (
+                    <button
+                      onClick={() => {
+                        setIsError(false);
+                        setLoadingStatus('Retrying...');
+                        setRetryCount(r => r + 1);
+                      }}
+                      className="px-4 py-1.5 rounded-[4px] bg-[#1C1B1B] text-[#E8BDB3] border border-[#282828] hover:bg-[#2A2A2A] text-sm font-semibold transition-colors cursor-pointer shadow-sm"
+                    >
+                      Retry
+                    </button>
+                  )}
                 </div>
               )}
               <div ref={containerRef} className="w-full h-[200px]" />
