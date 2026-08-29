@@ -6,6 +6,78 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Track } from '../../types';
 import { DropdownPortal } from '../ui/DropdownPortal';
 import { queuePanelVariants, EASE_OUT_EXPO } from '../../constants/motion';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+interface SortableQueueRowProps {
+  id: string;
+  track: Track;
+  index: number;
+  isManual: boolean;
+  onToggleMenu?: (e: React.MouseEvent<HTMLButtonElement>, index: number) => void;
+}
+
+const SortableQueueRow = ({ id, track, index, isManual, onToggleMenu }: SortableQueueRowProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 0,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        "flex items-center gap-2 p-1.5 rounded-[4px] group transition-colors hover:bg-[#2A2A2A] bg-[#1C1B1B]",
+        isDragging && "opacity-40",
+        "relative"
+      )}
+    >
+      <div {...attributes} {...listeners} className="text-[#E8BDB3]/30 hover:text-white cursor-grab active:cursor-grabbing p-1 touch-none">
+        <GripVertical className="w-3.5 h-3.5" />
+      </div>
+      
+      {!isManual && (
+        <div className="w-6 text-center text-[10px] text-[#E8BDB3]/40 font-mono hidden sm:block">
+          {index + 1}
+        </div>
+      )}
+      
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-medium text-[#E5E2E1] truncate">{track.title}</div>
+        <div className="text-[11px] text-[#E8BDB3]/60 truncate">{track.artist}</div>
+      </div>
+      
+      {isManual && onToggleMenu && (
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          onClick={(e) => onToggleMenu(e, index)}
+          className="p-1.5 hover:bg-[#1C1B1B] rounded-[3px] text-[#E8BDB3]/60 hover:text-white transition-all cursor-pointer"
+        >
+          <MoreHorizontal className="w-3.5 h-3.5" />
+        </motion.button>
+      )}
+    </div>
+  );
+};
+
 
 interface QueuePanelProps {
   isOpen: boolean;
@@ -19,15 +91,20 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({ isOpen, onClose }) => {
     manualQueue,
     isShuffle,
     shuffledContext,
+    sessionContext,
     removeFromQueue,
     reorderQueue,
+    reorderShuffledContext,
+    reorderSessionContext,
   } = usePlayer();
-
-  const [draggedItem, setDraggedItem] = useState<{ type: 'manual', index: number } | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<{ type: 'manual', index: number } | null>(null);
 
   const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null);
   const [menuTriggerRect, setMenuTriggerRect] = useState<DOMRect | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
 
   const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>, index: number) => {
     e.stopPropagation();
@@ -46,51 +123,40 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({ isOpen, onClose }) => {
     setMenuTriggerRect(null);
   };
 
-
-  // Calculate remaining context tracks
   let upcomingContextTracks: Track[] = [];
   if (isShuffle) {
     upcomingContextTracks = shuffledContext;
-  } else if (currentProject && currentTrack) {
-    const playableTracks = currentProject.tracks.filter(
-      (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
-    );
-    const idx = playableTracks.findIndex((t) => t.id === currentTrack.id);
-    if (idx !== -1) {
-      upcomingContextTracks = playableTracks.slice(idx + 1);
-    }
+  } else if (sessionContext) {
+    upcomingContextTracks = sessionContext;
   }
 
-  // Drag Handlers for manual queue
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedItem({ type: 'manual', index });
-    e.dataTransfer.effectAllowed = 'move';
-  };
+  const manualIds = manualQueue.map((t, i) => `manual-${t.id}-${i}`);
+  const upcomingIds = upcomingContextTracks.map((t, i) => `upcoming-${t.id}-${i}`);
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverItem?.index !== index) {
-      setDragOverItem({ type: 'manual', index });
+  const handleManualDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = manualIds.indexOf(active.id as string);
+      const newIndex = manualIds.indexOf(over.id as string);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderQueue(oldIndex, newIndex);
+      }
     }
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    if (!draggedItem || draggedItem.index === dropIndex) {
-      setDraggedItem(null);
-      setDragOverItem(null);
-      return;
+  const handleUpcomingDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = upcomingIds.indexOf(active.id as string);
+      const newIndex = upcomingIds.indexOf(over.id as string);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        if (isShuffle) {
+          reorderShuffledContext(oldIndex, newIndex);
+        } else {
+          reorderSessionContext(oldIndex, newIndex);
+        }
+      }
     }
-
-    reorderQueue(draggedItem.index, dropIndex);
-    setDraggedItem(null);
-    setDragOverItem(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDragOverItem(null);
   };
 
   return (
@@ -132,44 +198,22 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({ isOpen, onClose }) => {
             {manualQueue.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-bold text-[#E8BDB3]/80 uppercase tracking-widest px-2 mb-1.5">Up Next</h4>
-                <div className="space-y-0.5">
-                  {manualQueue.map((track, i) => {
-                    const isDragging = draggedItem?.index === i;
-                    const isDropTarget = dragOverItem?.index === i;
-                    return (
-                      <motion.div
-                        layout="position"
-                        transition={{ duration: 0.16, ease: EASE_OUT_EXPO }}
-                        key={`${track.id}-${i}`}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, i)}
-                        onDragOver={(e) => handleDragOver(e as unknown as React.DragEvent, i)}
-                        onDrop={(e) => handleDrop(e as unknown as React.DragEvent, i)}
-                        onDragEnd={handleDragEnd}
-                        className={clsx(
-                          "flex items-center gap-2 p-1.5 rounded-[4px] group transition-colors hover:bg-[#2A2A2A]",
-                          isDragging && "opacity-40",
-                          isDropTarget && "border-t-2 border-t-[#FF3B00]"
-                        )}
-                      >
-                        <div className="text-[#E8BDB3]/30 hover:text-white cursor-grab active:cursor-grabbing p-1 hidden sm:block">
-                          <GripVertical className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-medium text-[#E5E2E1] truncate">{track.title}</div>
-                          <div className="text-[11px] text-[#E8BDB3]/60 truncate">{track.artist}</div>
-                        </div>
-                        <motion.button
-                          whileTap={{ scale: 0.92 }}
-                          onClick={(e) => toggleMenu(e, i)}
-                          className="p-1.5 hover:bg-[#1C1B1B] rounded-[3px] text-[#E8BDB3]/60 hover:text-white transition-all cursor-pointer"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </motion.button>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleManualDragEnd}>
+                  <SortableContext items={manualIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-0.5">
+                      {manualQueue.map((track, i) => (
+                        <SortableQueueRow
+                          key={manualIds[i]}
+                          id={manualIds[i]}
+                          track={track}
+                          index={i}
+                          isManual={true}
+                          onToggleMenu={toggleMenu}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
 
@@ -179,22 +223,21 @@ export const QueuePanel: React.FC<QueuePanelProps> = ({ isOpen, onClose }) => {
                 <h4 className="text-[10px] font-bold text-[#E8BDB3]/50 uppercase tracking-widest px-2 mb-1.5">
                   Next from: <span className="text-[#E8BDB3]/80">{currentProject?.title}</span> {isShuffle ? '(Shuffled)' : ''}
                 </h4>
-                <div className="space-y-0.5 opacity-80">
-                  {upcomingContextTracks.map((track, i) => (
-                    <div
-                      key={track.id}
-                      className="flex items-center gap-2 p-1.5 rounded-[4px] transition-colors hover:bg-[#2A2A2A]"
-                    >
-                      <div className="w-6 text-center text-[10px] text-[#E8BDB3]/40 font-mono hidden sm:block">
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-medium text-[#E8BDB3] truncate">{track.title}</div>
-                        <div className="text-[11px] text-[#E8BDB3]/50 truncate">{track.artist}</div>
-                      </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleUpcomingDragEnd}>
+                  <SortableContext items={upcomingIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-0.5 opacity-80">
+                      {upcomingContextTracks.map((track, i) => (
+                        <SortableQueueRow
+                          key={upcomingIds[i]}
+                          id={upcomingIds[i]}
+                          track={track}
+                          index={i}
+                          isManual={false}
+                        />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
 

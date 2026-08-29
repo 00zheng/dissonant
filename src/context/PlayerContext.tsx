@@ -44,6 +44,10 @@ interface PlayerContextType {
   repeatMode: 'off' | 'all' | 'one';
   toggleRepeat: () => void;
 
+  sessionContext: Track[] | null;
+  reorderShuffledContext: (startIndex: number, endIndex: number) => void;
+  reorderSessionContext: (startIndex: number, endIndex: number) => void;
+
   isLoopEditorOpen: boolean;
   setIsLoopEditorOpen: (isOpen: boolean) => void;
 }
@@ -65,6 +69,16 @@ const generateShuffledContext = (project: Project, currentTrack: Track): Track[]
   return remaining;
 };
 
+const generateSessionContext = (project: Project, currentTrack: Track): Track[] => {
+  if (!project.tracks) return [];
+  const playable = project.tracks.filter(t => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample);
+  const idx = playable.findIndex(t => t.id === currentTrack.id);
+  if (idx !== -1) {
+    return playable.slice(idx + 1);
+  }
+  return [];
+};
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -79,6 +93,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [manualQueue, setManualQueue] = useState<Track[]>([]);
   const [isShuffle, setIsShuffle] = useState(false);
   const [shuffledContext, setShuffledContext] = useState<Track[]>([]);
+  const [sessionContext, setSessionContext] = useState<Track[] | null>(null);
   const [history, setHistory] = useState<Track[]>([]);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
 
@@ -94,6 +109,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const manualQueueRef = useRef<Track[]>([]);
   const isShuffleRef = useRef<boolean>(false);
   const shuffledContextRef = useRef<Track[]>([]);
+  const sessionContextRef = useRef<Track[] | null>(null);
   const historyRef = useRef<Track[]>([]);
   const repeatModeRef = useRef<'off' | 'all' | 'one'>('off');
 
@@ -102,6 +118,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { manualQueueRef.current = manualQueue; }, [manualQueue]);
   useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
   useEffect(() => { shuffledContextRef.current = shuffledContext; }, [shuffledContext]);
+  useEffect(() => { sessionContextRef.current = sessionContext; }, [sessionContext]);
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
 
@@ -155,20 +172,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // 3. Normal project tracklist order
-    if (track && !isShuffleRef.current) {
-      const playableTracks = proj.tracks.filter(
-        (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
-      );
-      const idx = playableTracks.findIndex((t) => t.id === track.id);
-      if (idx !== -1 && idx < playableTracks.length - 1) {
-        const nextTrack = playableTracks[idx + 1];
-        setCurrentTrack(nextTrack);
-        setDuration(nextTrack.duration || 0);
-        setCurrentTime(0);
-        playerEngine.loadAndPlay(nextTrack.audioUrl!);
-        return;
-      }
+    // 3. Normal project tracklist order from sessionContext
+    if (!isShuffleRef.current && sessionContextRef.current && sessionContextRef.current.length > 0) {
+      const nextTrack = sessionContextRef.current[0];
+      setSessionContext(prev => prev ? prev.slice(1) : []);
+      
+      setCurrentTrack(nextTrack);
+      setDuration(nextTrack.duration || 0);
+      setCurrentTime(0);
+      playerEngine.loadAndPlay(nextTrack.audioUrl!);
+      return;
     }
 
     // End of queue/project
@@ -192,6 +205,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           // Restart project from beginning
           const startTrack = playableTracks[0];
+          setSessionContext(generateSessionContext(proj, startTrack));
           setCurrentTrack(startTrack);
           setDuration(startTrack.duration || 0);
           setCurrentTime(0);
@@ -251,6 +265,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentProject(activeProject);
       if (isShuffleRef.current) {
         setShuffledContext(generateShuffledContext(activeProject, track));
+      } else {
+        setSessionContext(generateSessionContext(activeProject, track));
       }
     }
     
@@ -361,13 +377,36 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
+  const reorderShuffledContext = useCallback((startIndex: number, endIndex: number) => {
+    setShuffledContext(prev => {
+      const result = Array.from(prev);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
+    });
+  }, []);
+
+  const reorderSessionContext = useCallback((startIndex: number, endIndex: number) => {
+    setSessionContext(prev => {
+      if (!prev) return prev;
+      const result = Array.from(prev);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return result;
+    });
+  }, []);
+
   const toggleShuffle = useCallback(() => {
     const nextShuffle = !isShuffle;
     setIsShuffle(nextShuffle);
     if (nextShuffle && currentProjectRef.current && currentTrackRef.current) {
       setShuffledContext(generateShuffledContext(currentProjectRef.current, currentTrackRef.current));
+      setSessionContext(null);
     } else {
       setShuffledContext([]);
+      if (currentProjectRef.current && currentTrackRef.current) {
+        setSessionContext(generateSessionContext(currentProjectRef.current, currentTrackRef.current));
+      }
     }
   }, [isShuffle]);
 
@@ -405,6 +444,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         manualQueue,
         isShuffle,
         shuffledContext,
+        sessionContext,
         history,
         repeatMode,
 
@@ -420,6 +460,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playNextInQueue,
         removeFromQueue,
         reorderQueue,
+        reorderShuffledContext,
+        reorderSessionContext,
         toggleShuffle,
         toggleRepeat,
 
