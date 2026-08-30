@@ -251,13 +251,14 @@ export const AppContent: React.FC = () => {
   };
 
   // --- Project Handlers ---
-  const handleOpenCreateProject = (defaultFolderId?: string) => {
+  const handleOpenCreateProject = (defaultFolderId?: string | any) => {
     if (!user) {
       openAuth('signin');
       return;
     }
+    const safeFolderId = typeof defaultFolderId === 'string' ? defaultFolderId : undefined;
     setEditingProject(null);
-    setDefaultFolderIdForProject(defaultFolderId);
+    setDefaultFolderIdForProject(safeFolderId);
     setProjectModalOpen(true);
   };
 
@@ -281,13 +282,14 @@ export const AppContent: React.FC = () => {
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       updateCurrentProject(updated);
     } else {
+      const safeFolderId = typeof data.folderId === 'string' && data.folderId.length > 0 ? data.folderId : undefined;
       const newProject: Project = {
         id: `proj-${Date.now()}`,
         title: data.title || 'Untitled Project',
         artist: data.artist?.trim() || '',
         coverUrl: data.coverUrl || '',
         category: data.category || 'Album',
-        folderId: data.folderId,
+        folderId: safeFolderId,
         releaseDate: data.releaseDate || new Date().toISOString().split('T')[0],
         tracksCount: 0,
         totalDuration: '00m 00s',
@@ -657,7 +659,7 @@ export const AppContent: React.FC = () => {
                   onProjectSelect={handleProjectSelect}
                   onEditFolder={handleOpenEditFolder}
                   onDeleteFolder={handlePromptDeleteFolder}
-                  onCreateProject={handleOpenCreateProject}
+                  onCreateProject={(id) => handleOpenCreateProject(id)}
                   onEditProject={handleOpenEditProject}
                   onMoveProject={handleOpenMoveProject}
                   onDeleteProject={handlePromptDeleteProject}
@@ -716,7 +718,7 @@ export const AppContent: React.FC = () => {
                 projects={projects}
                 searchQuery={searchQuery}
                 onProjectSelect={handleProjectSelect}
-                onCreateProject={handleOpenCreateProject}
+                onCreateProject={() => handleOpenCreateProject()}
                 onEditProject={handleOpenEditProject}
                 onMoveProject={handleOpenMoveProject}
                 onDeleteProject={handlePromptDeleteProject}
@@ -733,7 +735,7 @@ export const AppContent: React.FC = () => {
                 onCreateFolder={handleOpenCreateFolder}
                 onEditFolder={handleOpenEditFolder}
                 onDeleteFolder={handlePromptDeleteFolder}
-                onCreateProject={handleOpenCreateProject}
+                onCreateProject={(id) => handleOpenCreateProject(id)}
                 onEditProject={handleOpenEditProject}
                 onMoveProject={handleOpenMoveProject}
                 onDeleteProject={handlePromptDeleteProject}
