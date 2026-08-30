@@ -58,7 +58,7 @@ export const FolderList: React.FC<FolderListProps> = ({
                 <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-[#E5E2E1]" />
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="text-[11px] sm:text-xs text-[#E8BDB3]/60 font-mono">
+                <span className="hidden sm:inline text-[11px] sm:text-xs text-[#E8BDB3]/60 font-mono">
                   {folder.itemCount} {folder.itemCount === 1 ? 'project' : 'projects'}
                 </span>
 
@@ -87,7 +87,12 @@ export const FolderList: React.FC<FolderListProps> = ({
 
           <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 flex items-center justify-between text-[11px] sm:text-xs text-[#E8BDB3]/50 border-t border-[#282828]/50 font-mono">
             <span>{folder.updatedAt}</span>
-            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8BDB3]/40 group-hover:text-white transition-colors" />
+            <div className="flex items-center gap-2">
+              <span className="sm:hidden">
+                {folder.itemCount} {folder.itemCount === 1 ? 'project' : 'projects'}
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8BDB3]/40 group-hover:text-white transition-colors" />
+            </div>
           </div>
         </Card>
       ))}

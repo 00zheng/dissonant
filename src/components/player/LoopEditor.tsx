@@ -11,6 +11,7 @@ import {
   loopEditorContentVariants,
   iconCrossfadeVariants,
 } from '../../constants/motion';
+import { getPeaksFromIDB, savePeaksToIDB } from '../../services/peakCache';
 
 const waveformCache = new Map<string, { peaks: Array<number[]>; duration: number }>();
 
@@ -31,6 +32,7 @@ export const LoopEditor: React.FC = () => {
   } = usePlayer();
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const playheadRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const regionsRef = useRef<RegionsPlugin | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -52,148 +54,182 @@ export const LoopEditor: React.FC = () => {
   useEffect(() => {
     if (!isLoopEditorOpen || !containerRef.current || !currentTrack?.audioUrl) return;
 
-    const cached = waveformCache.get(currentTrack.id);
-    let peaks: Array<number[]> | undefined = undefined;
-    let duration: number | undefined = undefined;
-
-    if (cached) {
-      peaks = cached.peaks;
-      duration = cached.duration;
-    }
-
+    let isSubscribed = true;
+    let ws: WaveSurfer | null = null;
+    let wsRegions: RegionsPlugin | null = null;
+    let unsubscribeTime = () => {};
+    let timeoutId: any;
     const t0 = performance.now();
-    console.log(`[Waveform] editor opened for track ${currentTrack.id}`);
-    console.log(`[Waveform] audio URL available: ${!!currentTrack.audioUrl}`);
-    console.log(`[Waveform] media readyState: ${playerEngine.getMediaElement().readyState}`);
-    console.log(`[Waveform] media duration: ${playerEngine.getMediaElement().duration}`);
 
-    setLoadingStatus(cached ? 'Loading from cache...' : 'Initializing...');
-    setIsError(false);
-    setIsReady(false);
+    const loadWaveform = async () => {
+      setIsError(false);
+      setIsReady(false);
 
-    // Completely decouple visual waveform from playback engine
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: '#FF562D',
-      progressColor: '#FF3B00',
-      cursorColor: '#FFFFFF',
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 2,
-      height: 200,
-      normalize: true,
-      interact: false, // Prevent WaveSurfer from handling its own seeking
-      peaks,
-      duration,
-      // If we don't have cached peaks, provide the URL so WaveSurfer can fetch and decode it independently
-      url: !cached ? currentTrack.audioUrl : undefined,
-      fetchParams: {
-        cache: 'no-cache', // Bypass iOS Safari opaque caching if audio element already fetched it
-      }
-    });
+      let cached = waveformCache.get(currentTrack.id);
+      let peaks = cached?.peaks;
+      let duration = cached?.duration;
 
-    // Mute WaveSurfer's internal audio to guarantee it never interferes with iOS audio session
-    ws.setVolume(0);
-
-    const wsRegions = ws.registerPlugin(RegionsPlugin.create());
-
-    wavesurferRef.current = ws;
-    regionsRef.current = wsRegions;
-
-    // Sync WaveSurfer visual cursor with the main player engine
-    const handleTimeUpdate = (time: number) => {
-      if (ws && isReady) {
-        ws.setTime(time);
-      }
-    };
-    const unsubscribeTime = playerEngine.onTimeUpdate(handleTimeUpdate);
-
-    // Allow clicking the waveform to seek the main player engine instead
-    ws.on('click', (relativeX) => {
-      const dur = playerEngine.getDuration();
-      if (dur) {
-        playerEngine.seek(relativeX * dur);
-      }
-    });
-
-    ws.on('load', () => {
-      console.log(`[Waveform] load started — ${Math.round(performance.now() - t0)}ms elapsed`);
-      setLoadingStatus('Loading...');
-    });
-    
-    ws.on('loading', (percent) => {
-      console.log(`[Waveform] loading progress ${percent}% — ${Math.round(performance.now() - t0)}ms elapsed`);
-      setLoadingStatus(`Loading waveform... ${percent}%`);
-    });
-
-    ws.on('decode', () => {
-      console.log(`[Waveform] decode event — ${Math.round(performance.now() - t0)}ms elapsed`);
-      setLoadingStatus('Decoding waveform...');
-    });
-
-    ws.on('error', (err: any) => {
-      console.error(`[Waveform] ERROR —`, err);
-      console.log(`[Waveform] complete error object:`, JSON.stringify(err, Object.getOwnPropertyNames(err)));
-      console.log(`[Waveform] error elapsed time: ${Math.round(performance.now() - t0)}ms`);
-      setIsError(true);
-      // Show actual error message instead of generic swallow
-      setLoadingStatus(`Error: ${err?.message || 'Could not load waveform'}`);
-    });
-
-    let timeoutId = setTimeout(() => {
-      if (!isReady && !isError) {
-        setIsError(true);
-        setLoadingStatus('Waveform is taking longer than expected.');
-      }
-    }, 20000);
-
-    ws.on('ready', () => {
-      clearTimeout(timeoutId);
-      const tReady = performance.now();
-      console.log(`[Waveform] ready event — ${Math.round(tReady - t0)}ms elapsed`);
-      setIsReady(true);
-
-      // Set initial time
-      ws.setTime(playerEngine.getCurrentTime());
-
-      if (!cached && currentTrack) {
-        try {
-          const exportedPeaks = ws.exportPeaks({ maxLength: 8000 });
-          const exportedDuration = ws.getDuration();
-          waveformCache.set(currentTrack.id, { peaks: exportedPeaks, duration: exportedDuration });
-          console.log(`[Waveform] cached peaks for track ${currentTrack.id}`);
-        } catch (err) {
-          console.error('[Waveform] Could not export peaks', err);
+      if (!cached) {
+        setLoadingStatus('Checking local cache...');
+        const idbCached = await getPeaksFromIDB(currentTrack.id);
+        if (idbCached && isSubscribed) {
+          peaks = idbCached.peaks;
+          duration = idbCached.duration;
+          waveformCache.set(currentTrack.id, { peaks, duration });
+          cached = { peaks, duration };
         }
       }
-      
-      const audioDuration = ws.getDuration() || playerEngine.getDuration();
-      const start = loopA !== null ? loopA : 0;
-      const end = loopB !== null ? loopB : audioDuration || 10;
-      
-      wsRegions.clearRegions();
-      wsRegions.addRegion({
-        start,
-        end,
-        color: 'rgba(250, 204, 21, 0.3)', // Yellow #FACC15
-        drag: true,
-        resize: true,
-        id: 'ab-loop',
-      });
-    });
 
-    wsRegions.on('region-updated', (region) => {
-      if (region.id === 'ab-loop') {
-        setLoopA(region.start);
-        setLoopB(region.end);
-        // Do NOT automatically activate the loop
+      if (!isSubscribed) return;
+
+      if (!cached) {
+        try {
+          setLoadingStatus('Diagnostic: FETCH...');
+          const tFetch = performance.now();
+          // Attempt the fetch separately to see if it fails at the network layer on iOS
+          const res = await fetch(currentTrack.audioUrl, { cache: 'no-cache' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          console.log(`[Waveform] Diagnostic Fetch OK. Time: ${Math.round(performance.now() - tFetch)}ms`);
+        } catch (err: any) {
+          console.error('[Waveform] Diagnostic Fetch Error:', err);
+          if (isSubscribed) {
+            setIsError(true);
+            const sourceType = currentTrack.audioUrl.startsWith('blob:') ? 'blob' : 'firebase';
+            setLoadingStatus(`Stage: FETCH\nError: ${err?.message}\nSource: ${sourceType}`);
+          }
+          return; // Stop here, network failed
+        }
       }
-    });
+
+      if (!isSubscribed) return;
+
+      setLoadingStatus(cached ? 'Loading from cache...' : 'Initializing...');
+
+      ws = WaveSurfer.create({
+        container: containerRef.current!,
+        waveColor: '#FF562D',
+        progressColor: '#FF3B00',
+        cursorColor: 'transparent',
+        cursorWidth: 0,
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 200,
+        normalize: true,
+        interact: false,
+        peaks,
+        duration,
+        url: !cached ? currentTrack.audioUrl : undefined,
+        fetchParams: {
+          cache: 'no-cache',
+        }
+      });
+
+      ws.setVolume(0);
+      wavesurferRef.current = ws;
+
+      wsRegions = ws.registerPlugin(RegionsPlugin.create());
+      regionsRef.current = wsRegions;
+
+      const handleTimeUpdate = (time: number) => {
+        const dur = playerEngine.getDuration();
+        if (dur > 0 && playheadRef.current) {
+          const percent = (time / dur) * 100;
+          playheadRef.current.style.left = `${percent}%`;
+        }
+      };
+      unsubscribeTime = playerEngine.onTimeUpdate(handleTimeUpdate);
+
+      ws.on('click', (relativeX) => {
+        const dur = playerEngine.getDuration();
+        if (dur) {
+          playerEngine.seek(relativeX * dur);
+        }
+      });
+
+      ws.on('load', () => {
+        if (!isSubscribed) return;
+        setLoadingStatus('Loading...');
+      });
+      
+      ws.on('loading', (percent) => {
+        if (!isSubscribed) return;
+        setLoadingStatus(`Loading waveform... ${percent}%`);
+      });
+
+      ws.on('decode', () => {
+        if (!isSubscribed) return;
+        setLoadingStatus('Diagnostic: DECODE...');
+      });
+
+      ws.on('error', (err: any) => {
+        if (!isSubscribed) return;
+        console.error(`[Waveform] ERROR —`, err);
+        setIsError(true);
+        setLoadingStatus(`Stage: WAVESURFER\nError: ${err?.message || 'Could not load waveform'}`);
+      });
+
+      timeoutId = setTimeout(() => {
+        if (!isReady && !isError && isSubscribed) {
+          setIsError(true);
+          setLoadingStatus('Stage: READY TIMEOUT\nWaveform took too long.');
+        }
+      }, 20000);
+
+      ws.on('ready', () => {
+        if (!isSubscribed) return;
+        clearTimeout(timeoutId);
+        setIsReady(true);
+
+        const initialTime = playerEngine.getCurrentTime();
+        const dur = ws!.getDuration() || playerEngine.getDuration();
+        if (dur > 0 && playheadRef.current) {
+          const percent = (initialTime / dur) * 100;
+          playheadRef.current.style.left = `${percent}%`;
+        }
+
+        if (!cached && currentTrack) {
+          try {
+            const exportedPeaks = ws!.exportPeaks({ maxLength: 8000 });
+            const exportedDuration = ws!.getDuration();
+            waveformCache.set(currentTrack.id, { peaks: exportedPeaks, duration: exportedDuration });
+            savePeaksToIDB(currentTrack.id, exportedPeaks, exportedDuration).catch(e => console.warn(e));
+          } catch (err) {
+            console.error('[Waveform] Could not export peaks', err);
+          }
+        }
+        
+        const start = loopA !== null ? loopA : 0;
+        const end = loopB !== null ? loopB : dur || 10;
+        
+        wsRegions!.clearRegions();
+        wsRegions!.addRegion({
+          start,
+          end,
+          color: 'rgba(250, 204, 21, 0.3)',
+          drag: true,
+          resize: true,
+          id: 'ab-loop',
+        });
+      });
+
+      wsRegions.on('region-updated', (region) => {
+        if (region.id === 'ab-loop') {
+          setLoopA(region.start);
+          setLoopB(region.end);
+        }
+      });
+    };
+
+    loadWaveform();
 
     return () => {
+      isSubscribed = false;
       clearTimeout(timeoutId);
       unsubscribeTime();
-      ws.destroy();
+      if (ws) {
+        ws.destroy();
+      }
       setIsReady(false);
     };
   }, [isLoopEditorOpen, currentTrack?.audioUrl, currentTrack?.id, retryCount]);
@@ -319,7 +355,14 @@ export const LoopEditor: React.FC = () => {
                   )}
                 </div>
               )}
-              <div ref={containerRef} className="w-full h-[200px]" />
+              <div className="relative w-full h-[200px]">
+                <div ref={containerRef} className="w-full h-full" />
+                <div 
+                  ref={playheadRef}
+                  className={`absolute top-0 bottom-0 w-[2px] bg-white z-[20] pointer-events-none shadow-[0_0_4px_rgba(0,0,0,0.5)] transition-opacity duration-200 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ left: '0%' }}
+                />
+              </div>
             </div>
 
             <div className="flex justify-between items-center mt-6 text-sm font-mono text-[#E8BDB3]">

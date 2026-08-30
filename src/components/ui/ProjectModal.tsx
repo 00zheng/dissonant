@@ -10,7 +10,7 @@ const CATEGORIES: ProjectCategory[] = ['Album', 'EP', 'Single', 'Stems', 'Demo']
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (projectData: Partial<Project>) => void;
+  onSave: (projectData: Partial<Project>) => Promise<void>;
   folders: Folder[];
   initialProject?: Project | null;
   defaultFolderId?: string;
@@ -29,6 +29,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [category, setCategory] = useState<ProjectCategory>('Album');
   const [folderId, setFolderId] = useState<string>('');
   const [tags, setTags] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialProject) {
@@ -44,11 +46,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       setFolderId(defaultFolderId || '');
       setTags('');
     }
+    setSaveError(null);
+    setIsSaving(false);
   }, [initialProject, isOpen, defaultFolderId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isSaving) return;
+
+    setIsSaving(true);
+    setSaveError(null);
 
     const parsedTags = tags
       .split(',')
@@ -68,8 +75,15 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       tracks: initialProject?.tracks || [],
     };
 
-    onSave(projectData);
-    onClose();
+    try {
+      await onSave(projectData);
+      onClose();
+    } catch (err: any) {
+      console.error('[ProjectModal] Save error:', err);
+      setSaveError(err.message || 'Failed to save project. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -79,6 +93,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
       title={initialProject ? 'Rename Project' : 'Create New Project'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {saveError && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-xs p-3 rounded-[4px]">
+            {saveError}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-semibold text-[#E8BDB3]/80 uppercase tracking-wider mb-1.5">
             Project Title
@@ -89,6 +108,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             onChange={(e) => setTitle(e.target.value)}
             required
             autoFocus
+            disabled={isSaving}
           />
         </div>
 
@@ -100,6 +120,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             placeholder="e.g. Alex"
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
+            disabled={isSaving}
           />
         </div>
 
@@ -110,6 +131,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           <select
             value={folderId}
             onChange={(e) => setFolderId(e.target.value)}
+            disabled={isSaving}
             className="w-full bg-[#1C1B1B] text-[#E5E2E1] border border-[#282828] rounded-[4px] py-2.5 px-3 text-sm focus:outline-none focus:border-[#FF3B00]"
           >
             <option value="">No Folder (Root)</option>
@@ -129,15 +151,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             placeholder="e.g. Piano, Lo-fi, Acoustic"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
+            disabled={isSaving}
           />
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-[#282828]">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button variant="accent" type="submit" disabled={!title.trim()}>
-            {initialProject ? 'Save Changes' : 'Create Project'}
+          <Button variant="accent" type="submit" disabled={!title.trim() || isSaving}>
+            {isSaving ? 'Saving...' : (initialProject ? 'Save Changes' : 'Create Project')}
           </Button>
         </div>
       </form>

@@ -294,8 +294,18 @@ export const AppContent: React.FC = () => {
         tags: data.tags || [],
         tracks: [],
       };
-      await fsSaveProject(user.uid, newProject);
+      
+      // Optimistic UI for New Project
       setProjects((prev) => [newProject, ...prev]);
+      
+      try {
+        await fsSaveProject(user.uid, newProject);
+      } catch (err) {
+        console.error('[ProjectCreate] Firestore save failed', err);
+        // Rollback optimistic add
+        setProjects((prev) => prev.filter(p => p.id !== newProject.id));
+        throw err;
+      }
     }
   };
 
