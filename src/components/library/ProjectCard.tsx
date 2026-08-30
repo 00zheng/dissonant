@@ -158,9 +158,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <h3 className="font-semibold text-xs sm:text-base text-[#E5E2E1] group-hover:text-white truncate">
             {project.title}
           </h3>
-          <p className="text-[11px] sm:text-xs text-[#E8BDB3]/60 truncate mt-0.5">
-            {project.artist}
-          </p>
+          {project.artist && (
+            <p className="text-[11px] sm:text-xs text-[#E8BDB3]/60 truncate mt-0.5">
+              {project.artist}
+            </p>
+          )}
         </div>
 
         <div className="pt-1.5 sm:pt-2 flex items-center justify-between text-[10px] sm:text-xs text-[#E8BDB3]/50 border-t border-[#282828] font-mono">

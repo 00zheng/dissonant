@@ -12,7 +12,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       devOptions: {
-        enabled: true,
+        enabled: false,
       },
       includeAssets: [
         'favicon.ico',
@@ -62,18 +62,6 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => {
-              return (
-                url.hostname.includes('googleapis.com') ||
-                url.hostname.includes('firebaseio.com') ||
-                /\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(url.pathname)
-              );
-            },
-            handler: 'NetworkOnly',
-          },
-        ],
       },
     }),
   ],

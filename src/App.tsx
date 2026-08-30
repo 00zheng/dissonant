@@ -284,7 +284,7 @@ export const AppContent: React.FC = () => {
       const newProject: Project = {
         id: `proj-${Date.now()}`,
         title: data.title || 'Untitled Project',
-        artist: data.artist || (user.displayName || 'Producer'),
+        artist: data.artist?.trim() || '',
         coverUrl: data.coverUrl || '',
         category: data.category || 'Album',
         folderId: data.folderId,

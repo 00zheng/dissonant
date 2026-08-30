@@ -198,9 +198,11 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-[#E5E2E1] tracking-tight truncate">
               {project.title}
             </h1>
-            <p className="text-sm sm:text-base lg:text-lg text-[#E8BDB3]/80 font-medium truncate">
-              {project.artist}
-            </p>
+            {project.artist && (
+              <p className="text-sm sm:text-base lg:text-lg text-[#E8BDB3]/80 font-medium truncate">
+                {project.artist}
+              </p>
+            )}
           </div>
 
           {/* Metadata */}

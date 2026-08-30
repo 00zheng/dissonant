@@ -15,6 +15,11 @@ import { getPeaksFromIDB, savePeaksToIDB } from '../../services/peakCache';
 
 const waveformCache = new Map<string, { peaks: Array<number[]>; duration: number }>();
 
+const sanitizeErrorMsg = (err: any) => {
+  const msg = err?.message || 'Unknown error';
+  return msg.replace(/token=[^&\s'"]+/, 'token=HIDDEN');
+};
+
 export const LoopEditor: React.FC = () => {
   const {
     currentTrack,
@@ -95,7 +100,7 @@ export const LoopEditor: React.FC = () => {
           if (isSubscribed) {
             setIsError(true);
             const sourceType = currentTrack.audioUrl.startsWith('blob:') ? 'blob' : 'firebase';
-            setLoadingStatus(`Stage: FETCH\nError: ${err?.message}\nSource: ${sourceType}`);
+            setLoadingStatus(`Stage: FETCH\nError: ${sanitizeErrorMsg(err)}\nSource: ${sourceType}`);
           }
           return; // Stop here, network failed
         }
@@ -166,7 +171,7 @@ export const LoopEditor: React.FC = () => {
         if (!isSubscribed) return;
         console.error(`[Waveform] ERROR —`, err);
         setIsError(true);
-        setLoadingStatus(`Stage: WAVESURFER\nError: ${err?.message || 'Could not load waveform'}`);
+        setLoadingStatus(`Stage: WAVESURFER\nError: ${sanitizeErrorMsg(err)}`);
       });
 
       timeoutId = setTimeout(() => {
