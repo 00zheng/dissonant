@@ -65,9 +65,6 @@ export class AudioPlayerEngine {
         }
         this.durationListeners.forEach((cb) => cb(dur));
         this.syncMediaSessionPosition();
-      }
-    });
-
     this.audio.addEventListener('play', () => {
       this.isPlayingState = true;
       this.notifyStateChange();
@@ -359,3 +356,40 @@ export class AudioPlayerEngine {
 }
 
 export const playerEngine = new AudioPlayerEngine();
+
+export class AudioPreloader {
+  private standbyAudio: HTMLAudioElement;
+  private currentTrackId: string | null = null;
+  private currentUrl: string | null = null;
+
+  constructor() {
+    this.standbyAudio = new Audio();
+    this.standbyAudio.preload = 'auto';
+    this.standbyAudio.volume = 0; // Ensure it never makes sound
+  }
+
+  public preload(trackId: string, url: string) {
+    if (this.currentTrackId === trackId && this.currentUrl === url) {
+      return; // Already preloading this
+    }
+    
+    console.log(`[Preloader] Preloading track ${trackId}`);
+    this.currentTrackId = trackId;
+    this.currentUrl = url;
+    
+    this.standbyAudio.src = url;
+    this.standbyAudio.load(); // Request the browser to fetch media data
+  }
+  
+  public clear() {
+    if (this.currentTrackId === null) return;
+    
+    console.log(`[Preloader] Clearing prefetch`);
+    this.currentTrackId = null;
+    this.currentUrl = null;
+    this.standbyAudio.removeAttribute('src');
+    this.standbyAudio.load();
+  }
+}
+
+export const audioPreloader = new AudioPreloader();

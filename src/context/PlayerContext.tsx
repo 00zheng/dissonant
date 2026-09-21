@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Track, Project } from '../types';
-import { playerEngine } from '../services/playerEngine';
+import { playerEngine, audioPreloader } from '../services/playerEngine';
 import { resolvePlayableTrack } from '../services/db';
 
 interface PlayerContextType {
@@ -131,16 +131,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const url = await resolvePlayableTrack(track);
     if (url) {
       playerEngine.loadAndPlay(url);
-
-      // Prefetch next logical track
-      const prefetchTrack = getNextLogicalTrack();
-      if (prefetchTrack) {
-        if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => resolvePlayableTrack(prefetchTrack));
-        } else {
-          setTimeout(() => resolvePlayableTrack(prefetchTrack), 1000);
-        }
-      }
     } else {
       console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
       setIsPlaying(false);
@@ -159,6 +149,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     return null;
   };
+
+  // Prefetch side-effect based on current queue/context states
+  useEffect(() => {
+    const nextTrack = (() => {
+      if (manualQueue.length > 0) return manualQueue[0];
+      if (isShuffle && shuffledContext.length > 0) return shuffledContext[0];
+      if (!isShuffle && sessionContext && sessionContext.length > 0) return sessionContext[0];
+      const proj = currentProject;
+      if (repeatMode === 'all' && proj && proj.tracks) {
+        const playableTracks = proj.tracks.filter((t) => t.hasAudio !== false && !t.isSample);
+        if (playableTracks.length > 0 && !isShuffle) {
+          return playableTracks[0];
+        }
+      }
+      return null;
+    })();
+
+    if (!nextTrack) {
+      audioPreloader.clear();
+      return;
+    }
+
+    let isSubscribed = true;
+    const doPrefetch = async () => {
+      const url = await resolvePlayableTrack(nextTrack);
+      if (isSubscribed && url) {
+        audioPreloader.preload(nextTrack.id, url);
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => doPrefetch());
+    } else {
+      setTimeout(() => doPrefetch(), 500);
+    }
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [manualQueue, isShuffle, shuffledContext, sessionContext, repeatMode, currentProject]);
 
   const advanceToNext = useCallback((isManualSkip: boolean = false) => {
     const track = currentTrackRef.current;
@@ -295,16 +325,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const url = await resolvePlayableTrack(track);
     if (url) {
       playerEngine.loadAndPlay(url);
-
-      // Prefetch next logical track
-      const prefetchTrack = getNextLogicalTrack();
-      if (prefetchTrack) {
-        if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => resolvePlayableTrack(prefetchTrack));
-        } else {
-          setTimeout(() => resolvePlayableTrack(prefetchTrack), 1000);
-        }
-      }
     } else {
       console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
       setIsPlaying(false);
