@@ -3,6 +3,7 @@ import { Library, Folder, Disc, LogOut, LogIn, Plus, Settings } from 'lucide-rea
 import { Project, ViewMode } from '../../types';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
+import { usePlayer } from '../../context/PlayerContext';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
 }) => {
   const { user, logout } = useAuth();
+  const { currentTrack } = usePlayer();
 
   const mainNavItems = [
     { id: 'library' as const, label: 'Library', icon: Library },
@@ -53,7 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 bg-[#0E0E0E] border-r border-[#282828] h-full flex flex-col justify-between select-none">
+    <aside className={clsx(
+      "w-64 bg-[#0E0E0E] border-r border-[#282828] h-full flex flex-col justify-between select-none",
+      currentTrack ? "pb-[88px]" : "pb-0"
+    )}>
       {/* Top Brand Header */}
       <div>
         <div className="p-6 border-b border-[#282828] flex items-center justify-between">

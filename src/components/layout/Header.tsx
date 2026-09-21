@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenSettings}
                 title="Settings"
-                className="text-[#E8BDB3]/60 hover:text-[#FF3B00] transition-colors p-1 cursor-pointer sm:hidden"
+                className="text-[#E8BDB3]/60 hover:text-[#FF3B00] transition-colors p-1 cursor-pointer"
               >
                 <Settings className="w-4 h-4" />
               </button>
