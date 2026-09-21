@@ -20,7 +20,7 @@ import { MOCK_FOLDERS, MOCK_PROJECTS } from '../data/mockData';
 
 // --- Local IndexedDB for Binary Audio File Blobs & Offline Fallback ---
 const IDB_NAME = 'dissonant_db';
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const STORE_FOLDERS = 'folders';
 const STORE_PROJECTS = 'projects';
 const STORE_AUDIO = 'audio_files';
@@ -55,25 +55,88 @@ function openIDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+interface CachedAudioBlob {
+  blob: Blob;
+  size: number;
+  lastAccessed: number;
+}
+
+const CACHE_BUDGET_BYTES = 250 * 1024 * 1024; // 250 MB
+
 // Audio Blob operations in IndexedDB
-export async function dbSaveAudioBlob(trackId: string, blob: Blob): Promise<void> {
+export async function dbSaveAudioBlob(trackId: string, blob: Blob, activeTrackId?: string): Promise<void> {
   const idb = await openIDB();
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(STORE_AUDIO, 'readwrite');
     const store = tx.objectStore(STORE_AUDIO);
-    const request = store.put(blob, trackId);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    
+    const record: CachedAudioBlob = {
+      blob,
+      size: blob.size,
+      lastAccessed: Date.now()
+    };
+    
+    store.put(record, trackId);
+    
+    const entries: { key: string; accessed: number; size: number }[] = [];
+    let totalSize = 0;
+    
+    const cursorReq = store.openCursor();
+    cursorReq.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        const val = cursor.value;
+        const size = val instanceof Blob ? val.size : (val.size || 0);
+        const accessed = val instanceof Blob ? 0 : (val.lastAccessed || 0);
+        totalSize += size;
+        entries.push({ key: cursor.key as string, accessed, size });
+        cursor.continue();
+      } else {
+        if (totalSize > CACHE_BUDGET_BYTES) {
+          entries.sort((a, b) => a.accessed - b.accessed);
+          let currentSize = totalSize;
+          for (const entry of entries) {
+            if (currentSize <= CACHE_BUDGET_BYTES) break;
+            if (entry.key === trackId || entry.key === activeTrackId) continue;
+            
+            store.delete(entry.key);
+            currentSize -= entry.size;
+          }
+        }
+      }
+    };
+    
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 export async function dbGetAudioBlob(trackId: string): Promise<Blob | null> {
   const idb = await openIDB();
   return new Promise((resolve, reject) => {
-    const tx = idb.transaction(STORE_AUDIO, 'readonly');
+    const tx = idb.transaction(STORE_AUDIO, 'readwrite');
     const store = tx.objectStore(STORE_AUDIO);
     const request = store.get(trackId);
-    request.onsuccess = () => resolve(request.result || null);
+    
+    request.onsuccess = () => {
+      const result = request.result;
+      if (!result) {
+        resolve(null);
+        return;
+      }
+      
+      let blob: Blob;
+      if (result instanceof Blob) {
+        blob = result;
+        // Migrate legacy blob
+        store.put({ blob, size: blob.size, lastAccessed: Date.now() }, trackId);
+      } else {
+        blob = result.blob;
+        result.lastAccessed = Date.now();
+        store.put(result, trackId);
+      }
+      resolve(blob);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -537,6 +600,15 @@ export async function fsDeleteTrack(userId: string, trackId: string, audioUrl?: 
   }
 
   await dbDeleteAudioBlob(trackId);
+}
+
+export async function fsUpdateTrackDuration(userId: string, trackId: string, duration: number, durationFormatted: string): Promise<void> {
+  const trackRef = doc(db, 'users', userId, 'tracks', trackId);
+  await setDoc(trackRef, {
+    duration,
+    durationFormatted,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
 }
 
 export function fsUploadAudioFile(userId: string, trackId: string, file: File): { task: UploadTask, storagePath: string } {

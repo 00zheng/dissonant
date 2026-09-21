@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Track, Project } from '../types';
 import { playerEngine, audioPreloader } from '../services/playerEngine';
-import { resolvePlayableTrack } from '../services/db';
+import { resolvePlayableTrack, fsUpdateTrackDuration } from '../services/db';
+import { useAuth } from './AuthContext';
+import { prefetchTrackAudio } from '../services/prefetch';
+import { formatDuration } from '../services/audio';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -103,6 +106,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loopB, setLoopBState] = useState<number | null>(null);
   const [isLoopActive, setIsLoopActiveState] = useState(false);
   const [isLoopEditorOpen, setIsLoopEditorOpen] = useState(false);
+  const { user } = useAuth();
 
   // Refs
   const currentTrackRef = useRef<Track | null>(null);
@@ -173,6 +177,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     let isSubscribed = true;
     const doPrefetch = async () => {
+      if (!isSubscribed) return;
+      
+      // Layer 2: reliable mobile background fetch
+      prefetchTrackAudio(nextTrack, currentTrackRef.current?.id).catch(console.warn);
+
+      // Layer 1: standard audio element preload
       const url = await resolvePlayableTrack(nextTrack);
       if (isSubscribed && url) {
         audioPreloader.preload(nextTrack.id, url);
@@ -180,7 +190,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(() => doPrefetch());
+      (window as any).requestIdleCallback(() => {
+        setTimeout(() => doPrefetch(), 500);
+      });
     } else {
       setTimeout(() => doPrefetch(), 500);
     }
@@ -272,7 +284,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const unsubState = playerEngine.onStateChange(setIsPlaying);
     const unsubTime = playerEngine.onTimeUpdate(setCurrentTime);
-    const unsubDuration = playerEngine.onDurationChange(setDuration);
+    const unsubDuration = playerEngine.onDurationChange((dur) => {
+      setDuration(dur);
+      const track = currentTrackRef.current;
+      if (track && dur > 0 && isFinite(dur) && Math.abs(dur - (track.duration || 0)) > 1) {
+        const roundedDur = Math.round(dur);
+        const newFormatted = formatDuration(roundedDur);
+        setCurrentTrack(prev => prev ? { ...prev, duration: roundedDur, durationFormatted: newFormatted } : null);
+        
+        if (user?.uid) {
+           fsUpdateTrackDuration(user.uid, track.id, roundedDur, newFormatted)
+             .catch(err => console.warn('[Player] Failed to update corrected track duration', err));
+        }
+      }
+    });
     const unsubLoop = playerEngine.onLoopChange((a, b, active) => {
       setLoopAState(a);
       setLoopBState(b);
