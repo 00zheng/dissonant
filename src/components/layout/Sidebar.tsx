@@ -1,5 +1,5 @@
 import React from 'react';
-import { Library, Folder, Disc, LogOut, LogIn, Plus } from 'lucide-react';
+import { Library, Folder, Disc, LogOut, LogIn, Plus, Settings } from 'lucide-react';
 import { Project, ViewMode } from '../../types';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ interface SidebarProps {
   projects?: Project[];
   onProjectSelect?: (project: Project) => void;
   onOpenAuth: () => void;
+  onOpenSettings: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,6 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   projects = [],
   onProjectSelect,
   onOpenAuth,
+  onOpenSettings,
 }) => {
   const { user, logout } = useAuth();
 
@@ -174,13 +176,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <p className="text-[10px] text-[#E8BDB3]/50 truncate">{user.email}</p>
               </div>
             </div>
-            <button
-              onClick={() => logout()}
-              title="Sign Out"
-              className="text-[#E8BDB3]/50 hover:text-[#FF3B00] p-1.5 rounded transition-colors cursor-pointer shrink-0 ml-1"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center">
+              <button
+                onClick={onOpenSettings}
+                title="Settings"
+                className="text-[#E8BDB3]/50 hover:text-white p-1.5 rounded transition-colors cursor-pointer shrink-0"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => logout()}
+                title="Sign Out"
+                className="text-[#E8BDB3]/50 hover:text-[#FF3B00] p-1.5 rounded transition-colors cursor-pointer shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ) : (
           <button

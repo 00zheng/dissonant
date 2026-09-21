@@ -18,6 +18,7 @@ import { ConfirmModal } from './components/ui/ConfirmModal';
 import { UploadTrackModal } from './components/ui/UploadTrackModal';
 import { TrackModal } from './components/ui/TrackModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { SettingsModal } from './components/ui/SettingsModal';
 import { Folder, Project, Track, ViewMode, RouteState } from './types';
 import { pageViewVariants } from './constants/motion';
 
@@ -93,6 +94,7 @@ export const AppContent: React.FC = () => {
   // Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
@@ -579,6 +581,7 @@ export const AppContent: React.FC = () => {
           projects={projects}
           onProjectSelect={handleProjectSelect}
           onOpenAuth={() => openAuth('signin')}
+          onOpenSettings={() => setSettingsModalOpen(true)}
         />
       </div>
 
@@ -603,6 +606,7 @@ export const AppContent: React.FC = () => {
               : undefined
           }
           onOpenAuth={() => openAuth('signin')}
+          onOpenSettings={() => setSettingsModalOpen(true)}
         />
 
         {/* Scrollable Main Screen Content */}
@@ -786,6 +790,11 @@ export const AppContent: React.FC = () => {
         initialMode={authModalMode}
       />
 
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+      />
+
       <FolderModal
         isOpen={folderModalOpen}
         onClose={() => setFolderModalOpen(false)}
@@ -847,13 +856,17 @@ export const AppContent: React.FC = () => {
   );
 };
 
+import { AudioSettingsProvider } from './context/AudioSettingsContext';
+
 export function App() {
   return (
     <MotionConfig reducedMotion="user">
       <AuthProvider>
-        <PlayerProvider>
-          <AppContent />
-        </PlayerProvider>
+        <AudioSettingsProvider>
+          <PlayerProvider>
+            <AppContent />
+          </PlayerProvider>
+        </AudioSettingsProvider>
       </AuthProvider>
     </MotionConfig>
   );

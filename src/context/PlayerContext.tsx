@@ -5,6 +5,8 @@ import { resolvePlayableTrack, fsUpdateTrackDuration } from '../services/db';
 import { useAuth } from './AuthContext';
 import { prefetchTrackAudio } from '../services/prefetch';
 import { formatDuration } from '../services/audio';
+import { useAudioSettings } from './AudioSettingsContext';
+import { analyzeLoudness, calculateNormalizationGain } from '../services/audioAnalysis';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -107,6 +109,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoopActive, setIsLoopActiveState] = useState(false);
   const [isLoopEditorOpen, setIsLoopEditorOpen] = useState(false);
   const { user } = useAuth();
+  const { settings } = useAudioSettings();
 
   // Refs
   const currentTrackRef = useRef<Track | null>(null);
@@ -126,6 +129,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { sessionContextRef.current = sessionContext; }, [sessionContext]);
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
+
+  useEffect(() => {
+    playerEngine.applyAudioProcessing(
+      settings.eqEnabled,
+      settings.eqGains,
+      settings.normalizeEnabled,
+      currentTrack?.normalizationGainDb || 0
+    );
+  }, [settings, currentTrack]);
+
+  useEffect(() => {
+    const track = currentTrack;
+    if (!track || track.hasAudio === false || track.isSample) return;
+    
+    // Lazy LUFS analysis on first playback if missing
+    if (track.normalizationGainDb === undefined) {
+      resolvePlayableTrack(track).then(url => {
+        if (!url) return;
+        analyzeLoudness(url).then(lufs => {
+          const gain = calculateNormalizationGain(lufs);
+          if (currentTrackRef.current?.id === track.id) {
+            setCurrentTrack(prev => prev ? { ...prev, loudnessLUFS: lufs, normalizationGainDb: gain } : null);
+            // Engine effect above will catch this state update and apply the gain
+          }
+        }).catch(err => console.warn('[Player] LUFS analysis failed:', err));
+      });
+    }
+  }, [currentTrack]);
 
   const playResolvedTrack = async (track: Track) => {
     setCurrentTrack(track);

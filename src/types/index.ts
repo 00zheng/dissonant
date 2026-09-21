@@ -15,6 +15,9 @@ export interface Track {
   coverUrl?: string;
   hasAudio?: boolean; // true if backed by real Firebase Storage file or local IndexedDB Blob
   isSample?: boolean; // true if mock metadata only
+  loudnessLUFS?: number;
+  normalizationGainDb?: number;
+  loudnessAnalysisVersion?: number;
 }
 
 export type ProjectCategory = 'Album' | 'EP' | 'Single' | 'Stems' | 'Demo';

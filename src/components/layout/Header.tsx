@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, ArrowLeft, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Search, ArrowLeft, LogIn, LogOut, User as UserIcon, Settings } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { ViewMode } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ interface HeaderProps {
   onBack?: () => void;
   title?: string;
   onOpenAuth?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onBack,
   title,
   onOpenAuth,
+  onOpenSettings,
 }) => {
   const { user, logout } = useAuth();
 
@@ -92,9 +94,16 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="h-3 w-px bg-[#282828]" />
               <button
+                onClick={onOpenSettings}
+                title="Settings"
+                className="text-[#E8BDB3]/60 hover:text-[#FF3B00] transition-colors p-1 cursor-pointer sm:hidden"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
                 onClick={() => logout()}
                 title="Log Out"
-                className="text-[#E8BDB3]/60 hover:text-[#FF3B00] transition-colors text-[11px] sm:text-xs font-semibold uppercase tracking-wider cursor-pointer"
+                className="text-[#E8BDB3]/60 hover:text-[#FF3B00] transition-colors text-[11px] sm:text-xs font-semibold uppercase tracking-wider cursor-pointer ml-1"
               >
                 <span className="hidden sm:inline">Sign Out</span>
                 <span className="sm:hidden">Exit</span>
