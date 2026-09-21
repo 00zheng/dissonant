@@ -146,18 +146,42 @@ export const AppContent: React.FC = () => {
   // Load User Data from Firestore on Auth Change
   useEffect(() => {
     if (user) {
+      let isSubscribed = true;
       setDataLoading(true);
-      initUserData(user.uid)
+
+      // 1. Try cache for instant load
+      initUserData(user.uid, 'cache')
         .then(({ folders: loadedFolders, projects: loadedProjects }) => {
-          setFolders(loadedFolders);
-          setProjects(loadedProjects);
+          if (!isSubscribed) return;
+          if (loadedFolders.length > 0 || loadedProjects.length > 0) {
+            setFolders(loadedFolders);
+            setProjects(loadedProjects);
+            setDataLoading(false); // Instant render
+          }
         })
-        .catch((err) => {
-          console.error('Failed to load user data from Firestore:', err);
+        .catch(() => {
+          // Cache miss is fine, just ignore
         })
         .finally(() => {
-          setDataLoading(false);
+          if (!isSubscribed) return;
+          // 2. Fetch fresh data from server in background
+          initUserData(user.uid, 'server')
+            .then(({ folders: loadedFolders, projects: loadedProjects }) => {
+              if (!isSubscribed) return;
+              setFolders(loadedFolders);
+              setProjects(loadedProjects);
+            })
+            .catch((err) => {
+              console.error('Failed to load user data from Firestore:', err);
+            })
+            .finally(() => {
+              if (isSubscribed) setDataLoading(false);
+            });
         });
+
+      return () => {
+        isSubscribed = false;
+      };
     } else {
       setFolders([]);
       setProjects([]);

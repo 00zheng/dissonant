@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Track, Project } from '../types';
 import { playerEngine } from '../services/playerEngine';
+import { resolvePlayableTrack } from '../services/db';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -56,7 +57,7 @@ const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 const generateShuffledContext = (project: Project, currentTrack: Track): Track[] => {
   if (!project.tracks) return [];
-  const playable = project.tracks.filter(t => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample);
+  const playable = project.tracks.filter(t => t.hasAudio !== false && !t.isSample);
   
   // Exclude current track
   const remaining = playable.filter(t => t.id !== currentTrack.id);
@@ -71,7 +72,7 @@ const generateShuffledContext = (project: Project, currentTrack: Track): Track[]
 
 const generateSessionContext = (project: Project, currentTrack: Track): Track[] => {
   if (!project.tracks) return [];
-  const playable = project.tracks.filter(t => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample);
+  const playable = project.tracks.filter(t => t.hasAudio !== false && !t.isSample);
   const idx = playable.findIndex(t => t.id === currentTrack.id);
   if (idx !== -1) {
     return playable.slice(idx + 1);
@@ -122,6 +123,43 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { historyRef.current = history; }, [history]);
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
 
+  const playResolvedTrack = async (track: Track) => {
+    setCurrentTrack(track);
+    setDuration(track.duration || 0);
+    setCurrentTime(0);
+
+    const url = await resolvePlayableTrack(track);
+    if (url) {
+      playerEngine.loadAndPlay(url);
+
+      // Prefetch next logical track
+      const prefetchTrack = getNextLogicalTrack();
+      if (prefetchTrack) {
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(() => resolvePlayableTrack(prefetchTrack));
+        } else {
+          setTimeout(() => resolvePlayableTrack(prefetchTrack), 1000);
+        }
+      }
+    } else {
+      console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
+      setIsPlaying(false);
+    }
+  };
+
+  const getNextLogicalTrack = (): Track | null => {
+    if (manualQueueRef.current.length > 0) {
+      return manualQueueRef.current[0];
+    }
+    if (isShuffleRef.current && shuffledContextRef.current.length > 0) {
+      return shuffledContextRef.current[0];
+    }
+    if (!isShuffleRef.current && sessionContextRef.current && sessionContextRef.current.length > 0) {
+      return sessionContextRef.current[0];
+    }
+    return null;
+  };
+
   const advanceToNext = useCallback((isManualSkip: boolean = false) => {
     const track = currentTrackRef.current;
     
@@ -145,11 +183,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (manualQueueRef.current.length > 0) {
       const nextTrack = manualQueueRef.current[0];
       setManualQueue(prev => prev.slice(1));
-      
-      setCurrentTrack(nextTrack);
-      setDuration(nextTrack.duration || 0);
-      setCurrentTime(0);
-      playerEngine.loadAndPlay(nextTrack.audioUrl!);
+      playResolvedTrack(nextTrack);
       return;
     }
 
@@ -164,11 +198,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (isShuffleRef.current && shuffledContextRef.current.length > 0) {
       const nextTrack = shuffledContextRef.current[0];
       setShuffledContext(prev => prev.slice(1));
-      
-      setCurrentTrack(nextTrack);
-      setDuration(nextTrack.duration || 0);
-      setCurrentTime(0);
-      playerEngine.loadAndPlay(nextTrack.audioUrl!);
+      playResolvedTrack(nextTrack);
       return;
     }
 
@@ -176,18 +206,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!isShuffleRef.current && sessionContextRef.current && sessionContextRef.current.length > 0) {
       const nextTrack = sessionContextRef.current[0];
       setSessionContext(prev => prev ? prev.slice(1) : []);
-      
-      setCurrentTrack(nextTrack);
-      setDuration(nextTrack.duration || 0);
-      setCurrentTime(0);
-      playerEngine.loadAndPlay(nextTrack.audioUrl!);
+      playResolvedTrack(nextTrack);
       return;
     }
 
     // End of queue/project
     if (repeatModeRef.current === 'all' && proj) {
       const playableTracks = proj.tracks.filter(
-        (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+        (t) => t.hasAudio !== false && !t.isSample
       );
       
       if (playableTracks.length > 0) {
@@ -196,20 +222,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const startTrack = playableTracks[Math.floor(Math.random() * playableTracks.length)];
           const newShuffled = generateShuffledContext(proj, startTrack);
           setShuffledContext(newShuffled);
-          
-          setCurrentTrack(startTrack);
-          setDuration(startTrack.duration || 0);
-          setCurrentTime(0);
-          playerEngine.loadAndPlay(startTrack.audioUrl!);
+          playResolvedTrack(startTrack);
           return;
         } else {
           // Restart project from beginning
           const startTrack = playableTracks[0];
           setSessionContext(generateSessionContext(proj, startTrack));
-          setCurrentTrack(startTrack);
-          setDuration(startTrack.duration || 0);
-          setCurrentTime(0);
-          playerEngine.loadAndPlay(startTrack.audioUrl!);
+          playResolvedTrack(startTrack);
           return;
         }
       }
@@ -244,8 +263,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [advanceToNext]);
 
-  const playTrack = useCallback((track: Track, project?: Project) => {
-    if (!track.audioUrl || track.hasAudio === false || track.isSample) {
+  const playTrack = useCallback(async (track: Track, project?: Project) => {
+    if (track.hasAudio === false || track.isSample) {
       console.warn(`[Player] Track "${track.title}" has no audio file.`);
       return;
     }
@@ -259,7 +278,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setHistory(prev => [...prev, currentTrackRef.current!]);
     }
 
-    setCurrentTrack(track);
     const activeProject = project || currentProjectRef.current;
     if (activeProject) {
       setCurrentProject(activeProject);
@@ -270,9 +288,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
     
+    setCurrentTrack(track);
     setDuration(track.duration || 0);
     setCurrentTime(0);
-    playerEngine.loadAndPlay(track.audioUrl);
+
+    const url = await resolvePlayableTrack(track);
+    if (url) {
+      playerEngine.loadAndPlay(url);
+
+      // Prefetch next logical track
+      const prefetchTrack = getNextLogicalTrack();
+      if (prefetchTrack) {
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(() => resolvePlayableTrack(prefetchTrack));
+        } else {
+          setTimeout(() => resolvePlayableTrack(prefetchTrack), 1000);
+        }
+      }
+    } else {
+      console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
+      setIsPlaying(false);
+    }
   }, []);
 
   const updateCurrentProject = useCallback((project: Project) => {
@@ -281,12 +317,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const togglePlay = useCallback(() => {
-    if (!currentTrackRef.current || !currentTrackRef.current.audioUrl || currentTrackRef.current.hasAudio === false) {
+  const togglePlay = useCallback(async () => {
+    if (!currentTrackRef.current || currentTrackRef.current.hasAudio === false) {
       return;
     }
+    
+    // If we're toggling play and audio src isn't set, we might need to resolve it
+    const mediaEl = playerEngine.getMediaElement();
+    if (!mediaEl.src || mediaEl.src.endsWith(window.location.host + '/')) {
+        const url = await resolvePlayableTrack(currentTrackRef.current);
+        if (url) {
+            playerEngine.loadAndPlay(url, currentTime);
+            return;
+        }
+    }
+    
     playerEngine.togglePlay();
-  }, []);
+  }, [currentTime]);
 
   const seek = useCallback((seconds: number) => {
     playerEngine.seek(seconds);
@@ -323,10 +370,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const prevTrack = hist[hist.length - 1];
       setHistory(prev => prev.slice(0, -1));
       
-      setCurrentTrack(prevTrack);
-      setDuration(prevTrack.duration || 0);
-      setCurrentTime(0);
-      playerEngine.loadAndPlay(prevTrack.audioUrl!);
+      playResolvedTrack(prevTrack);
       return;
     }
 
@@ -336,22 +380,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!proj || !track || !proj.tracks) return;
 
     const playableTracks = proj.tracks.filter(
-      (t) => t.hasAudio !== false && Boolean(t.audioUrl) && !t.isSample
+      (t) => t.hasAudio !== false && !t.isSample
     );
     const idx = playableTracks.findIndex((t) => t.id === track.id);
     if (idx > 0) {
       const prevTrack = playableTracks[idx - 1];
-      setCurrentTrack(prevTrack);
-      setDuration(prevTrack.duration || 0);
-      setCurrentTime(0);
-      playerEngine.loadAndPlay(prevTrack.audioUrl!);
+      playResolvedTrack(prevTrack);
     } else {
       const lastTrack = playableTracks[playableTracks.length - 1];
       if (lastTrack) {
-        setCurrentTrack(lastTrack);
-        setDuration(lastTrack.duration || 0);
-        setCurrentTime(0);
-        playerEngine.loadAndPlay(lastTrack.audioUrl!);
+        playResolvedTrack(lastTrack);
       }
     }
   }, []);

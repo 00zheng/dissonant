@@ -2,6 +2,8 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromCache,
+  getDocsFromServer,
   setDoc,
   deleteDoc,
   writeBatch,
@@ -23,26 +25,34 @@ const STORE_FOLDERS = 'folders';
 const STORE_PROJECTS = 'projects';
 const STORE_AUDIO = 'audio_files';
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openIDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(IDB_NAME, IDB_VERSION);
 
-    request.onupgradeneeded = (event) => {
-      const dbInstance = (event.target as IDBOpenDBRequest).result;
-      if (!dbInstance.objectStoreNames.contains(STORE_FOLDERS)) {
-        dbInstance.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
-      }
-      if (!dbInstance.objectStoreNames.contains(STORE_PROJECTS)) {
-        dbInstance.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
-      }
-      if (!dbInstance.objectStoreNames.contains(STORE_AUDIO)) {
-        dbInstance.createObjectStore(STORE_AUDIO);
-      }
-    };
+      request.onupgradeneeded = (event) => {
+        const dbInstance = (event.target as IDBOpenDBRequest).result;
+        if (!dbInstance.objectStoreNames.contains(STORE_FOLDERS)) {
+          dbInstance.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
+        }
+        if (!dbInstance.objectStoreNames.contains(STORE_PROJECTS)) {
+          dbInstance.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+        }
+        if (!dbInstance.objectStoreNames.contains(STORE_AUDIO)) {
+          dbInstance.createObjectStore(STORE_AUDIO);
+        }
+      };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        dbPromise = null; // allow retry
+        reject(request.error);
+      };
+    });
+  }
+  return dbPromise;
 }
 
 // Audio Blob operations in IndexedDB
@@ -79,32 +89,31 @@ export async function dbDeleteAudioBlob(trackId: string): Promise<void> {
   });
 }
 
-export async function resolveTrackAudio(
-  trackId: string,
-  rawAudioUrl?: string
-): Promise<{ resolvedUrl: string; hasAudio: boolean; isSample: boolean; storagePath?: string }> {
-  // 1. Check local IndexedDB binary cache first for instant playback
-  try {
-    const blob = await dbGetAudioBlob(trackId);
-    if (blob && blob.size > 0) {
-      const storagePath =
-        rawAudioUrl && (rawAudioUrl.startsWith('users/') || rawAudioUrl.startsWith('gs://'))
-          ? rawAudioUrl
-          : undefined;
-      return {
-        resolvedUrl: URL.createObjectURL(blob),
-        hasAudio: true,
-        isSample: false,
-        storagePath,
-      };
-    }
-  } catch (err) {
-    console.warn(`[IDB] Error checking audio blob for ${trackId}:`, err);
+const audioResolutionCache = new Map<string, Promise<string>>();
+
+export async function resolvePlayableTrack(track: Track): Promise<string> {
+  if (!track.audioUrl && !track.storagePath) {
+    return '';
   }
 
-  // 2. Check if rawAudioUrl is a valid Firebase Storage path or download URL
-  if (rawAudioUrl) {
-    let storagePath = rawAudioUrl;
+  const cacheKey = `${track.id}_${track.storagePath || track.audioUrl}`;
+  if (audioResolutionCache.has(cacheKey)) {
+    return audioResolutionCache.get(cacheKey)!;
+  }
+
+  const resolutionPromise = (async () => {
+    // 1. Check local IndexedDB binary cache first for instant playback
+    try {
+      const blob = await dbGetAudioBlob(track.id);
+      if (blob && blob.size > 0) {
+        return URL.createObjectURL(blob);
+      }
+    } catch (err) {
+      console.warn(`[IDB] Error checking audio blob for ${track.id}:`, err);
+    }
+
+    // 2. Resolve via Firebase Storage if it's a gs:// or users/ path
+    let storagePath = track.storagePath || track.audioUrl || '';
     if (storagePath.startsWith('gs://')) {
       const url = new URL(storagePath);
       storagePath = url.pathname.slice(1);
@@ -113,44 +122,24 @@ export async function resolveTrackAudio(
     if (storagePath.startsWith('users/')) {
       try {
         const fileRef = ref(storage, storagePath);
-        const downloadUrl = await getDownloadURL(fileRef);
-        return {
-          resolvedUrl: downloadUrl,
-          hasAudio: true,
-          isSample: false,
-          storagePath,
-        };
+        return await getDownloadURL(fileRef);
       } catch (err) {
-        console.warn(`[Storage] Could not resolve storage path "${storagePath}" for track ${trackId}:`, err);
-        return {
-          resolvedUrl: '',
-          hasAudio: false,
-          isSample: true,
-          storagePath,
-        };
+        console.warn(`[Storage] Could not resolve storage path "${storagePath}" for track ${track.id}:`, err);
+        audioResolutionCache.delete(cacheKey); // allow retry on failure
+        return '';
       }
     }
 
-    if (storagePath.startsWith('https://firebasestorage.googleapis.com')) {
-      return {
-        resolvedUrl: storagePath,
-        hasAudio: true,
-        isSample: false,
-      };
+    // 3. Fallback to existing valid URL
+    if (storagePath.startsWith('http')) {
+      return storagePath;
     }
-  }
 
-  // 3. Fallback: Only mock/sample metadata exists
-  return {
-    resolvedUrl: '',
-    hasAudio: false,
-    isSample: true,
-  };
-}
+    return '';
+  })();
 
-export async function dbResolveTrackAudioUrl(track: Track): Promise<string> {
-  const result = await resolveTrackAudio(track.id, track.storagePath || track.audioUrl);
-  return result.resolvedUrl;
+  audioResolutionCache.set(cacheKey, resolutionPromise);
+  return resolutionPromise;
 }
 
 // Get local IndexedDB folders and projects (used for migration)
@@ -184,14 +173,16 @@ async function getLocalData(): Promise<{ folders: Folder[]; projects: Project[] 
 
 // --- Firestore User Data Operations (/users/{userId}/...) ---
 
-export async function initUserData(userId: string): Promise<{ folders: Folder[]; projects: Project[] }> {
+export async function initUserData(userId: string, source: 'default' | 'cache' | 'server' = 'default'): Promise<{ folders: Folder[]; projects: Project[] }> {
   const foldersCol = collection(db, 'users', userId, 'folders');
   const projectsCol = collection(db, 'users', userId, 'projects');
   const tracksCol = collection(db, 'users', userId, 'tracks');
 
+  const fetcher = source === 'cache' ? getDocsFromCache : (source === 'server' ? getDocsFromServer : getDocs);
+
   const [foldersSnap, projectsSnap] = await Promise.all([
-    getDocs(foldersCol),
-    getDocs(projectsCol),
+    fetcher(foldersCol),
+    fetcher(projectsCol),
   ]);
 
   // If user has no existing Firestore data, migrate from local IndexedDB / initial mock data
@@ -215,18 +206,18 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
   });
 
   // Load Tracks
-  const tracksSnap = await getDocs(tracksCol);
+  const tracksSnap = await fetcher(tracksCol);
   const tracksMap = new Map<string, Track[]>();
 
   for (const trackDoc of tracksSnap.docs) {
     const data = trackDoc.data();
     const rawAudioUrl = data.audioUrl || '';
+    const storagePath = data.storagePath;
 
-    // Check whether track has real audio in Storage / IndexedDB or is mock metadata
-    const { resolvedUrl, hasAudio, isSample, storagePath } = await resolveTrackAudio(
-      trackDoc.id,
-      rawAudioUrl
-    );
+    // Track objects are constructed immediately without awaiting audio resolution at startup.
+    // hasAudio is inferred quickly from whether it has a path or url to try.
+    const hasAudio = Boolean(storagePath || rawAudioUrl);
+    const isSample = !hasAudio;
 
     const track: Track = {
       id: trackDoc.id,
@@ -240,7 +231,7 @@ export async function initUserData(userId: string): Promise<{ folders: Folder[];
       key: data.key || undefined,
       versionTag: data.versionTag || undefined,
       stemsCount: data.stemsCount,
-      audioUrl: resolvedUrl,
+      audioUrl: rawAudioUrl,
       storagePath,
       coverUrl: data.coverUrl || undefined,
       hasAudio,
