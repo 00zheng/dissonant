@@ -509,6 +509,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setPlaybackRate = useCallback((rate: number) => playerEngine.setPlaybackRate(rate), []);
 
   // --- Media Session API Integration ---
+  const playNextRef = useRef(playNext);
+  const playPreviousRef = useRef(playPrevious);
+
+  useEffect(() => {
+    playNextRef.current = playNext;
+    playPreviousRef.current = playPrevious;
+  }, [playNext, playPrevious]);
+
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => {
@@ -518,27 +526,32 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playerEngine.pause();
       });
       navigator.mediaSession.setActionHandler('previoustrack', () => {
-        playPrevious();
+        if (playPreviousRef.current) playPreviousRef.current();
       });
       navigator.mediaSession.setActionHandler('nexttrack', () => {
-        playNext();
+        if (playNextRef.current) playNextRef.current();
       });
       
       // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
       try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
       try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
     }
-  }, [playPrevious, playNext]);
+  }, []);
 
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
+      const coverSrc = currentProject?.coverUrl || currentTrack.coverUrl;
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title || 'Unknown Title',
-        artist: currentTrack.artist || currentProject?.artist || 'Unknown Artist',
+        artist: currentProject?.title || '',
         album: currentProject?.title || 'Dissonant',
-        artwork: (currentTrack.coverUrl || currentProject?.coverUrl) ? [
-          { src: currentTrack.coverUrl || currentProject?.coverUrl || '', sizes: '512x512', type: 'image/jpeg' },
-          { src: currentTrack.coverUrl || currentProject?.coverUrl || '', sizes: '192x192', type: 'image/jpeg' },
+        artwork: coverSrc ? [
+          { src: coverSrc, sizes: '96x96' },
+          { src: coverSrc, sizes: '128x128' },
+          { src: coverSrc, sizes: '192x192' },
+          { src: coverSrc, sizes: '256x256' },
+          { src: coverSrc, sizes: '384x384' },
+          { src: coverSrc, sizes: '512x512' },
         ] : undefined
       });
     }
