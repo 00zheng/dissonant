@@ -168,7 +168,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
               </div>
 
               {/* Playback Speed Control Panel */}
-              <div className="bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
+              <div className="hidden md:block bg-[#131313] border border-[#282828] rounded-[6px] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#E8BDB3]/80">
                     <Gauge className="w-4 h-4 text-[#FF3B00]" />
@@ -302,7 +302,7 @@ export const PlayerExpanded: React.FC<PlayerExpandedProps> = ({ onClose }) => {
               </div>
 
               {/* Volume Slider */}
-              <div className="flex items-center gap-3 pt-3 border-t border-[#282828] max-w-xs mx-auto w-full">
+              <div className="hidden md:flex items-center gap-3 pt-3 border-t border-[#282828] max-w-xs mx-auto w-full">
                 <motion.button
                   whileTap={{ scale: 0.92 }}
                   onClick={toggleMute}

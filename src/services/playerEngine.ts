@@ -65,6 +65,9 @@ export class AudioPlayerEngine {
         }
         this.durationListeners.forEach((cb) => cb(dur));
         this.syncMediaSessionPosition();
+      }
+    });
+
     this.audio.addEventListener('play', () => {
       this.isPlayingState = true;
       this.notifyStateChange();
