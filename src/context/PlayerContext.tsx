@@ -549,24 +549,36 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [playNext, playPrevious]);
 
   useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => {
-        playerEngine.play();
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        playerEngine.pause();
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        if (playPreviousRef.current) playPreviousRef.current();
-      });
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        if (playNextRef.current) playNextRef.current();
-      });
-      
-      // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
-      try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
-      try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
-    }
+    const registerMediaSessionActions = () => {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+          playerEngine.play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          playerEngine.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          if (playPreviousRef.current) playPreviousRef.current();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          if (playNextRef.current) playNextRef.current();
+        });
+        
+        // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
+        try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
+        try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
+      }
+    };
+
+    const mediaEl = playerEngine.getMediaElement();
+    mediaEl.addEventListener('playing', registerMediaSessionActions);
+
+    // Initial registration just in case
+    registerMediaSessionActions();
+
+    return () => {
+      mediaEl.removeEventListener('playing', registerMediaSessionActions);
+    };
   }, []);
 
   useEffect(() => {

@@ -124,6 +124,10 @@ export class AudioPlayerEngine {
     normalizeEnabled: boolean, 
     normalizationGainDb: number = 0
   ) {
+    if (!eqEnabled && !normalizeEnabled && !this.isAudioGraphInitialized) {
+      return;
+    }
+
     if (!this.isAudioGraphInitialized) {
       // Lazy init on first processing request if not already done
       this.initWebAudio();
@@ -271,8 +275,20 @@ export class AudioPlayerEngine {
     await this.play();
   }
 
+  private configurePlaybackAudioSession() {
+    if ('audioSession' in navigator) {
+      try {
+        (navigator as any).audioSession.type = 'playback';
+      } catch (e) {
+        console.warn('[Player] Failed to set audioSession type:', e);
+      }
+    }
+  }
+
   public async play(): Promise<void> {
     if (!this.audio.src) return;
+
+    this.configurePlaybackAudioSession();
 
     this.audio.playbackRate = this.playbackRateState;
 
@@ -284,11 +300,6 @@ export class AudioPlayerEngine {
     this.audio.volume = this.isMutedState ? 0 : this.volumeState;
 
     try {
-      // Lazy init Audio Graph if not yet created on first play
-      if (!this.isAudioGraphInitialized && !this.webAudioGraphFailed) {
-        this.initWebAudio();
-      }
-      
       // Resume AudioContext if suspended (required for iOS/Safari autoplay policy)
       if (this.audioCtx && this.audioCtx.state === 'suspended') {
         await this.audioCtx.resume().catch(e => console.warn('[Player] AudioContext resume failed:', e));
