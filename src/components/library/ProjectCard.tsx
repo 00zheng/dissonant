@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Project } from '../../types';
 import { Card } from '../ui/Card';
-import { Play, MoreVertical, Edit2, FolderInput, Trash2 } from 'lucide-react';
+import { Play, MoreVertical, Edit2, FolderInput, Trash2, GripHorizontal } from 'lucide-react';
 
 import { usePlayer } from '../../context/PlayerContext';
 import { NEUTRAL_COVER_FALLBACK } from '../../data/mockData';
@@ -52,13 +54,29 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     }
   };
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
   return (
-    <Card
-      variant="low"
-      hoverEffect
-      onClick={() => onClick(project)}
-      className="flex flex-col h-full group border-[#282828] hover:border-[#353534] transition-colors rounded-[8px] overflow-hidden bg-[#1C1B1B] relative"
-    >
+    <div ref={setNodeRef} style={style} className="h-full">
+      <Card
+        variant="low"
+        hoverEffect
+        onClick={() => onClick(project)}
+        className="flex flex-col h-full group border-[#282828] hover:border-[#353534] transition-colors rounded-[8px] overflow-hidden bg-[#1C1B1B] relative"
+      >
       {/* Artwork Container - Visually Dominant */}
       <div className="relative aspect-square w-full bg-[#131313] overflow-hidden">
         <img
@@ -86,9 +104,20 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           <div className="absolute bottom-3 right-3 bg-[#FF3B00] w-3 h-3 rounded-full shadow-md" />
         )}
 
-        {/* Project Context Menu Trigger */}
-        {(onEditProject || onMoveProject || onDeleteProject) && (
-          <div className="absolute top-3 right-3 z-10">
+        {/* Project Context Menu Trigger & Drag Handle */}
+        <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="p-1.5 rounded-[4px] bg-[#0E0E0E]/80 backdrop-blur-xs border border-[#282828] text-[#E8BDB3]/60 hover:text-white hover:bg-[#2A2A2A] transition-colors cursor-grab active:cursor-grabbing flex items-center justify-center touch-none"
+            title="Drag to reorder"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripHorizontal className="w-4 h-4" />
+          </div>
+
+          {(onEditProject || onMoveProject || onDeleteProject) && (
             <motion.button
               whileTap={{ scale: 0.90 }}
               onClick={handleMenuClick}
@@ -97,8 +126,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             >
               <MoreVertical className="w-4 h-4" />
             </motion.button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Options Dropdown via Portal */}
@@ -166,10 +195,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
         </div>
 
         <div className="pt-1.5 sm:pt-2 flex items-center justify-between text-[10px] sm:text-xs text-[#E8BDB3]/50 border-t border-[#282828] font-mono">
-          <span>{project.tracksCount} {project.tracksCount === 1 ? 'track' : 'tracks'}</span>
-          <span className="hidden sm:inline">{project.totalDuration}</span>
         </div>
       </div>
     </Card>
-  );
+  </div>
+);
 };

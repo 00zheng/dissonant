@@ -312,11 +312,12 @@ export async function initUserData(userId: string, source: 'default' | 'cache' |
   });
 
   // Load Projects
-  const projects: Project[] = projectsSnap.docs.map((d) => {
+  const projects: Project[] = projectsSnap.docs.map((d, index) => {
     const data = d.data();
     const projTracks = tracksMap.get(d.id) || [];
     return {
       id: d.id,
+      order: data.order ?? index,
       title: data.title || '',
       artist: data.artist || '',
       coverUrl: data.coverUrl || '',
@@ -330,6 +331,8 @@ export async function initUserData(userId: string, source: 'default' | 'cache' |
       tracks: projTracks,
     };
   });
+
+  projects.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   return { folders, projects };
 }
@@ -360,6 +363,7 @@ async function migrateLocalDataToFirestore(
     const projectRef = doc(db, 'users', userId, 'projects', project.id);
     batch.set(projectRef, {
       id: project.id,
+      order: project.order ?? 0,
       title: project.title,
       artist: project.artist,
       coverUrl: project.coverUrl || '',
@@ -442,6 +446,7 @@ export async function fsSaveProject(userId: string, project: Project): Promise<P
   const projectRef = doc(db, 'users', userId, 'projects', project.id);
   const payload: any = {
     id: project.id,
+    order: project.order ?? 0,
     title: project.title,
     artist: project.artist,
     coverUrl: project.coverUrl || '',
@@ -657,6 +662,15 @@ export async function fsReorderTracks(userId: string, tracks: Track[]): Promise<
   tracks.forEach((track, index) => {
     const trackRef = doc(db, 'users', userId, 'tracks', track.id);
     batch.update(trackRef, { order: index, updatedAt: serverTimestamp() });
+  });
+  await batch.commit();
+}
+
+export async function fsReorderProjects(userId: string, projects: Project[]): Promise<void> {
+  const batch = writeBatch(db);
+  projects.forEach((project, index) => {
+    const projectRef = doc(db, 'users', userId, 'projects', project.id);
+    batch.update(projectRef, { order: index, updatedAt: serverTimestamp() });
   });
   await batch.commit();
 }

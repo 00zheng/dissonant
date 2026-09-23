@@ -24,6 +24,7 @@ export type ProjectCategory = 'Album' | 'EP' | 'Single' | 'Stems' | 'Demo';
 
 export interface Project {
   id: string;
+  order?: number;
   title: string;
   artist: string;
   coverUrl: string;

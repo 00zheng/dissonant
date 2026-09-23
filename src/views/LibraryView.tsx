@@ -20,6 +20,7 @@ interface LibraryViewProps {
   onEditProject: (project: Project) => void;
   onMoveProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
+  onReorderProjects: (projects: Project[]) => void;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -37,6 +38,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onEditProject,
   onMoveProject,
   onDeleteProject,
+  onReorderProjects,
 }) => {
   // Filter projects by search query
   const filteredProjects = projects.filter((project) => {
@@ -61,7 +63,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   });
 
   return (
-    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-8 sm:space-y-10 max-w-7xl mx-auto pb-44">
+    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-8 sm:space-y-10 max-w-7xl mx-auto">
       {/* Main Library Header */}
       <div className="border-b border-[#282828] pb-5 sm:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -145,6 +147,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           onMoveProject={onMoveProject}
           onDeleteProject={onDeleteProject}
           onCreateProject={() => onCreateProject()}
+          onReorderProjects={onReorderProjects}
         />
       </section>
     </div>

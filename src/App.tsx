@@ -31,6 +31,7 @@ import {
   fsMoveProject,
   fsDeleteTrack,
   fsReorderTracks,
+  fsReorderProjects,
   fsUploadCoverImage,
   fsDeleteCoverImage,
 } from './services/db';
@@ -90,6 +91,10 @@ export const AppContent: React.FC = () => {
   const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname));
   const [searchQuery, setSearchQuery] = useState('');
   const reorderVersionRef = useRef(0);
+  const projectReorderVersionRef = useRef(0);
+
+  const { currentTrack } = usePlayer();
+  const isPlayerVisible = !!currentTrack;
 
   // Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -309,8 +314,10 @@ export const AppContent: React.FC = () => {
       updateCurrentProject(updated);
     } else {
       const safeFolderId = typeof data.folderId === 'string' && data.folderId.length > 0 ? data.folderId : undefined;
+      const minOrder = projects.length > 0 ? Math.min(...projects.map(p => p.order ?? 0)) : 0;
       const newProject: Project = {
         id: `proj-${Date.now()}`,
+        order: minOrder - 1,
         title: data.title || 'Untitled Project',
         artist: data.artist?.trim() || '',
         coverUrl: data.coverUrl || '',
@@ -349,6 +356,26 @@ export const AppContent: React.FC = () => {
     setProjects((prev) =>
       prev.map((p) => (p.id === projectId ? { ...p, folderId: targetFolderId || undefined } : p))
     );
+  };
+
+  const handleReorderProjects = async (reorderedProjects: Project[]) => {
+    if (!user) return;
+
+    projectReorderVersionRef.current += 1;
+    const version = projectReorderVersionRef.current;
+    const previousProjects = [...projects];
+
+    // Optimistic UI update
+    setProjects(reorderedProjects);
+
+    try {
+      await fsReorderProjects(user.uid, reorderedProjects);
+    } catch (error) {
+      console.error("Failed to persist reordered projects:", error);
+      if (version === projectReorderVersionRef.current) {
+        setProjects(previousProjects);
+      }
+    }
   };
 
   const handlePromptDeleteProject = (project: Project) => {
@@ -750,6 +777,7 @@ export const AppContent: React.FC = () => {
                 onEditProject={handleOpenEditProject}
                 onMoveProject={handleOpenMoveProject}
                 onDeleteProject={handlePromptDeleteProject}
+                onReorderProjects={handleReorderProjects}
               />
             ) : (
               <LibraryView
@@ -767,8 +795,19 @@ export const AppContent: React.FC = () => {
                 onEditProject={handleOpenEditProject}
                 onMoveProject={handleOpenMoveProject}
                 onDeleteProject={handlePromptDeleteProject}
+                onReorderProjects={handleReorderProjects}
               />
             )}
+            
+            {/* Dynamic spacer to prevent overlap with fixed bottom bars */}
+            <div 
+              className="w-full shrink-0" 
+              style={{ 
+                height: isPlayerVisible 
+                  ? 'calc(110px + 3.5rem + env(safe-area-inset-bottom))' 
+                  : 'calc(3.5rem + env(safe-area-inset-bottom))' 
+              }} 
+            />
           </motion.div>
         </main>
 

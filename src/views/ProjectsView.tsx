@@ -12,6 +12,7 @@ interface ProjectsViewProps {
   onEditProject?: (project: Project) => void;
   onMoveProject?: (project: Project) => void;
   onDeleteProject?: (project: Project) => void;
+  onReorderProjects?: (projects: Project[]) => void;
 }
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({
@@ -22,6 +23,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   onEditProject,
   onMoveProject,
   onDeleteProject,
+  onReorderProjects,
 }) => {
   const filteredProjects = projects.filter((project) => {
     if (searchQuery) {
@@ -36,7 +38,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
   });
 
   return (
-    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-44">
+    <div className="py-6 sm:py-10 px-5 sm:px-8 lg:px-12 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
       {/* Header bar */}
       <div className="border-b border-[#282828] pb-5 sm:pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -80,6 +82,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
           onMoveProject={onMoveProject}
           onDeleteProject={onDeleteProject}
           onCreateProject={onCreateProject}
+          onReorderProjects={onReorderProjects}
         />
       </section>
     </div>
