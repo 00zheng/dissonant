@@ -172,6 +172,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentTrack]);
 
+  const commitMetadata = useCallback((track: Track, project: Project | null) => {
+    metadataCommittedRef.current = true;
+    if ('mediaSession' in navigator) {
+      const coverSrc = project?.coverUrl || track.coverUrl;
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title || 'Unknown Title',
+        artist: project?.title || '',
+        album: project?.title || 'Dissonant',
+        artwork: coverSrc ? [
+          { src: coverSrc, sizes: '96x96' },
+          { src: coverSrc, sizes: '128x128' },
+          { src: coverSrc, sizes: '192x192' },
+          { src: coverSrc, sizes: '256x256' },
+          { src: coverSrc, sizes: '384x384' },
+          { src: coverSrc, sizes: '512x512' },
+        ] : undefined
+      });
+      playerEngine.syncMediaSessionPosition();
+    }
+  }, []);
+
   const playResolvedTrack = async (track: Track, trySync: boolean = false) => {
     const requestId = playerEngine.bumpRequestId();
     playRequestIdRef.current = requestId;
@@ -191,9 +212,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (cachedUrl) {
       // Fast path: URL is already resolved.  Commit metadata immediately.
       loadingTrackIdRef.current = null;
-      metadataCommittedRef.current = true;
+      commitMetadata(track, currentProjectRef.current);
       setCurrentTrack(track);
       activeEngineTrackIdRef.current = track.id;
+      playerEngine.setKnownDuration(track.duration || 0);
       if (trySync) {
         playerEngine.loadAndPlaySync(cachedUrl, 0, requestId);
       } else {
@@ -245,8 +267,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // Commit metadata now that we're about to start playback
-      metadataCommittedRef.current = true;
+      commitMetadata(track, currentProjectRef.current);
       activeEngineTrackIdRef.current = track.id;
+      playerEngine.setKnownDuration(track.duration || 0);
       playerEngine.loadAndPlay(url, 0, requestId);
     }
   };
@@ -716,27 +739,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   useEffect(() => {
-    // Only push metadata to Media Session when it's been committed
-    // (URL resolved, playback starting).  During the async resolution
-    // phase, metadataCommittedRef is false, so the lock screen keeps
-    // the PREVIOUS track's metadata until the new one is actually ready.
-    if ('mediaSession' in navigator && currentTrack && metadataCommittedRef.current) {
-      const coverSrc = currentProject?.coverUrl || currentTrack.coverUrl;
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentTrack.title || 'Unknown Title',
-        artist: currentProject?.title || '',
-        album: currentProject?.title || 'Dissonant',
-        artwork: coverSrc ? [
-          { src: coverSrc, sizes: '96x96' },
-          { src: coverSrc, sizes: '128x128' },
-          { src: coverSrc, sizes: '192x192' },
-          { src: coverSrc, sizes: '256x256' },
-          { src: coverSrc, sizes: '384x384' },
-          { src: coverSrc, sizes: '512x512' },
-        ] : undefined
-      });
+    if (currentTrack && metadataCommittedRef.current) {
+      commitMetadata(currentTrack, currentProject);
     }
-  }, [currentTrack, currentProject]);
+  }, [currentTrack, currentProject, commitMetadata]);
 
   return (
     <PlayerContext.Provider

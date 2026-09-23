@@ -6,6 +6,10 @@ export type ErrorCallback = (error: any) => void;
 export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
 export type PlaybackRateCallback = (rate: number) => void;
 
+const DIAG = () => {
+  try { return localStorage.getItem('dissonant_diag') === 'true'; } catch(e) { return false; }
+};
+
 export class AudioPlayerEngine {
   private audio: HTMLAudioElement;
   private isPlayingState: boolean = false;
@@ -19,6 +23,7 @@ export class AudioPlayerEngine {
 
   private currentTimeState: number = 0;
   private durationState: number = 0;
+  private knownDuration: number = 0;
   private currentSrc: string = '';
   private currentRequestId: number = 0;
 
@@ -227,6 +232,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('ended', () => {
+      if (DIAG()) console.log('[Diag] playerEngine ended event fired');
       if (this.isLoopActiveState && this.loopAState !== null && this.loopBState !== null && this.loopAState < this.loopBState) {
         this.audio.currentTime = this.loopAState;
         this.play();
@@ -245,6 +251,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('error', (e) => {
+      if (DIAG()) console.log('[Diag] playerEngine error event:', e);
       // Only mark as not-playing if this error is for the current source
       if (this.audio.src === this.currentSrc || this.currentSrc === '') {
         this.isPlayingState = false;
@@ -259,9 +266,7 @@ export class AudioPlayerEngine {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = this.isPlayingState ? 'playing' : 'paused';
     }
-    if (this.isPlayingState) {
-      this.syncMediaSessionPosition();
-    }
+    this.syncMediaSessionPosition();
   }
 
   private notifyLoopChange() {
@@ -276,11 +281,14 @@ export class AudioPlayerEngine {
         const dur = this.getDuration();
         const curr = this.getCurrentTime();
         if (dur && !isNaN(dur) && isFinite(dur) && curr >= 0 && curr <= dur) {
+          if (DIAG()) console.log(`[Diag] Syncing MediaSession position: curr=${curr.toFixed(2)}, dur=${dur.toFixed(2)}`);
           navigator.mediaSession.setPositionState({
             duration: dur,
             playbackRate: this.playbackRateState,
             position: curr,
           });
+        } else {
+          if (DIAG()) console.log(`[Diag] Skipping MediaSession sync: curr=${curr}, dur=${dur}`);
         }
       } catch (e) {
         // Ignore errors if values are somehow invalid for the API
@@ -302,6 +310,7 @@ export class AudioPlayerEngine {
       this.clearLoop();
       this.currentSrc = src;
       this.currentTimeState = startTime;
+      this.durationState = 0;
       this.audio.src = src;
     }
 
@@ -319,6 +328,7 @@ export class AudioPlayerEngine {
       this.clearLoop();
       this.currentSrc = src;
       this.currentTimeState = startTime;
+      this.durationState = 0;
       this.audio.src = src;
     }
 
@@ -360,7 +370,9 @@ export class AudioPlayerEngine {
       }
 
       await this.audio.play();
+      if (DIAG()) console.log('[Diag] audio.play() succeeded');
     } catch (err) {
+      if (DIAG()) console.log('[Diag] audio.play() rejected:', err);
       console.warn('[Player] audio.play() error:', err);
       // Only mark paused if this is still the active request AND the element is actually paused.
       // A newer play() may have already succeeded on a different source.
@@ -393,7 +405,10 @@ export class AudioPlayerEngine {
 
     const playPromise = this.audio.play();
     if (playPromise !== undefined) {
-      playPromise.catch(err => {
+      playPromise.then(() => {
+        if (DIAG()) console.log('[Diag] audio.playSync() succeeded');
+      }).catch(err => {
+        if (DIAG()) console.log('[Diag] audio.playSync() rejected:', err);
         console.warn('[Player] audio.playSync() error (likely background autoplay policy):', err);
         // Only mark paused if this is still the active request AND the element is actually paused.
         if (this.currentRequestId === currentReq && this.audio.paused) {
@@ -512,8 +527,16 @@ export class AudioPlayerEngine {
     return this.currentTimeState;
   }
 
+  public setKnownDuration(dur: number): void {
+    this.knownDuration = dur;
+  }
+
   public getDuration(): number {
-    return this.durationState;
+    const audioDur = this.audio.duration;
+    if (audioDur && !isNaN(audioDur) && isFinite(audioDur)) {
+      return audioDur;
+    }
+    return this.durationState || this.knownDuration;
   }
 
   public getVolume(): number {
