@@ -120,6 +120,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const sessionContextRef = useRef<Track[] | null>(null);
   const historyRef = useRef<Track[]>([]);
   const repeatModeRef = useRef<'off' | 'all' | 'one'>('off');
+  const prefetchedUrlRef = useRef<Record<string, string>>({});
 
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
@@ -158,17 +159,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentTrack]);
 
-  const playResolvedTrack = async (track: Track) => {
+  const playResolvedTrack = async (track: Track, trySync: boolean = false) => {
     setCurrentTrack(track);
     setDuration(track.duration || 0);
     setCurrentTime(0);
 
-    const url = await resolvePlayableTrack(track);
-    if (url) {
-      playerEngine.loadAndPlay(url);
+    const cachedUrl = prefetchedUrlRef.current[track.id];
+
+    if (cachedUrl) {
+      if (trySync) {
+        playerEngine.loadAndPlaySync(cachedUrl);
+      } else {
+        playerEngine.loadAndPlay(cachedUrl);
+      }
     } else {
-      console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
-      setIsPlaying(false);
+      const url = await resolvePlayableTrack(track);
+      if (url) {
+        playerEngine.loadAndPlay(url);
+      } else {
+        console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -203,6 +214,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (!nextTrack) {
       audioPreloader.clear();
+      prefetchedUrlRef.current = {};
       return;
     }
 
@@ -217,6 +229,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const url = await resolvePlayableTrack(nextTrack);
       if (isSubscribed && url) {
         audioPreloader.preload(nextTrack.id, url);
+        prefetchedUrlRef.current = { [nextTrack.id]: url };
       }
     };
 
@@ -256,7 +269,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (manualQueueRef.current.length > 0) {
       const nextTrack = manualQueueRef.current[0];
       setManualQueue(prev => prev.slice(1));
-      playResolvedTrack(nextTrack);
+      playResolvedTrack(nextTrack, true);
       return;
     }
 
@@ -271,7 +284,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (isShuffleRef.current && shuffledContextRef.current.length > 0) {
       const nextTrack = shuffledContextRef.current[0];
       setShuffledContext(prev => prev.slice(1));
-      playResolvedTrack(nextTrack);
+      playResolvedTrack(nextTrack, true);
       return;
     }
 
@@ -279,7 +292,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!isShuffleRef.current && sessionContextRef.current && sessionContextRef.current.length > 0) {
       const nextTrack = sessionContextRef.current[0];
       setSessionContext(prev => prev ? prev.slice(1) : []);
-      playResolvedTrack(nextTrack);
+      playResolvedTrack(nextTrack, true);
       return;
     }
 
@@ -295,13 +308,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const startTrack = playableTracks[Math.floor(Math.random() * playableTracks.length)];
           const newShuffled = generateShuffledContext(proj, startTrack);
           setShuffledContext(newShuffled);
-          playResolvedTrack(startTrack);
+          playResolvedTrack(startTrack, true);
           return;
         } else {
           // Restart project from beginning
           const startTrack = playableTracks[0];
           setSessionContext(generateSessionContext(proj, startTrack));
-          playResolvedTrack(startTrack);
+          playResolvedTrack(startTrack, true);
           return;
         }
       }

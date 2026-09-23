@@ -275,6 +275,21 @@ export class AudioPlayerEngine {
     await this.play();
   }
 
+  public loadAndPlaySync(src: string, startTime: number = 0): void {
+    if (this.currentSrc !== src) {
+      this.clearLoop();
+      this.currentSrc = src;
+      this.currentTimeState = startTime;
+      this.audio.src = src;
+    }
+
+    this.audio.pause();
+    this.isPlayingState = false;
+
+    this.audio.currentTime = startTime;
+    this.playSync();
+  }
+
   private configurePlaybackAudioSession() {
     if ('audioSession' in navigator) {
       try {
@@ -308,6 +323,31 @@ export class AudioPlayerEngine {
       await this.audio.play();
     } catch (err) {
       console.warn('[Player] audio.play() error:', err);
+    }
+  }
+
+  public playSync(): void {
+    if (!this.audio.src) return;
+
+    this.configurePlaybackAudioSession();
+
+    this.audio.playbackRate = this.playbackRateState;
+
+    if ('preservesPitch' in this.audio) {
+      (this.audio as any).preservesPitch = true;
+    }
+
+    this.audio.volume = this.isMutedState ? 0 : this.volumeState;
+
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(e => console.warn('[Player] AudioContext resume failed:', e));
+    }
+
+    const playPromise = this.audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('[Player] audio.playSync() error (likely background autoplay policy):', err);
+      });
     }
   }
 
