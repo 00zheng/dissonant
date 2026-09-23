@@ -6,6 +6,8 @@ export type ErrorCallback = (error: any) => void;
 export type LoopStateCallback = (loopA: number | null, loopB: number | null, isLoopActive: boolean) => void;
 export type PlaybackRateCallback = (rate: number) => void;
 
+import { diagnostics } from '../utils/diagnostics';
+
 const DIAG = () => {
   try { return localStorage.getItem('dissonant_diag') === 'true'; } catch(e) { return false; }
 };
@@ -211,6 +213,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('play', () => {
+      diagnostics.log('PlayerEngine', 'event:play', { src: this.audio.src, currentSrc: this.currentSrc, paused: this.audio.paused });
       // Only update state if this event is for the current request's source.
       // During rapid track switches, a stale source's 'play' event should
       // not override the state of a newer load.
@@ -220,6 +223,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('pause', () => {
+      diagnostics.log('PlayerEngine', 'event:pause', { suppressPauseNotify: this.suppressPauseNotify, currentTime: this.audio.currentTime, src: this.audio.src });
       // If suppressPauseNotify is set, this is a transitional pause during a
       // track switch (old audio being paused before new src loads).  We still
       // update isPlayingState for internal bookkeeping, but we do NOT push
@@ -232,6 +236,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('ended', () => {
+      diagnostics.log('PlayerEngine', 'event:ended', { currentTime: this.audio.currentTime, src: this.audio.src });
       if (DIAG()) console.log('[Diag] playerEngine ended event fired');
       if (this.isLoopActiveState && this.loopAState !== null && this.loopBState !== null && this.loopAState < this.loopBState) {
         this.audio.currentTime = this.loopAState;
@@ -251,6 +256,7 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('error', (e) => {
+      diagnostics.log('PlayerEngine', 'event:error', { error: e, src: this.audio.src });
       if (DIAG()) console.log('[Diag] playerEngine error event:', e);
       // Only mark as not-playing if this error is for the current source
       if (this.audio.src === this.currentSrc || this.currentSrc === '') {
@@ -262,9 +268,11 @@ export class AudioPlayerEngine {
   }
 
   private notifyStateChange() {
+      const stateStr = this.isPlayingState ? 'playing' : 'paused';
+      diagnostics.log('PlayerEngine', 'notifyStateChange', { isPlayingState: this.isPlayingState, mediaSessionState: stateStr });
     this.stateListeners.forEach((cb) => cb(this.isPlayingState));
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = this.isPlayingState ? 'playing' : 'paused';
+      navigator.mediaSession.playbackState = stateStr;
     }
     this.syncMediaSessionPosition();
   }
@@ -370,8 +378,10 @@ export class AudioPlayerEngine {
       }
 
       await this.audio.play();
+      diagnostics.log('PlayerEngine', 'play() succeeded', { src: this.audio.src });
       if (DIAG()) console.log('[Diag] audio.play() succeeded');
     } catch (err) {
+      diagnostics.log('PlayerEngine', 'play() rejected', { error: String(err), src: this.audio.src });
       if (DIAG()) console.log('[Diag] audio.play() rejected:', err);
       console.warn('[Player] audio.play() error:', err);
       // Only mark paused if this is still the active request AND the element is actually paused.
@@ -423,6 +433,7 @@ export class AudioPlayerEngine {
     const reqId = requestId ?? ++this.currentRequestId;
     this.currentRequestId = reqId;
     this.intentionallyPaused = true;
+    diagnostics.log('PlayerEngine', 'pause() called', { intentionallyPaused: true, reqId });
     this.audio.pause();
     // The 'pause' event listener will set isPlayingState = false.
     // Force-sync here in case the element was already paused (no event fires).
@@ -686,11 +697,17 @@ export class AudioPreloader {
   }
 
   public preload(trackId: string, url: string) {
+    if (diagnostics.disableStandbyAudio) {
+      diagnostics.log('AudioPreloader', 'preload skipped (disabled via diagnostics)', { trackId });
+      return;
+    }
+    
     if (this.currentTrackId === trackId && this.currentUrl === url) {
       return; // Already preloading this
     }
     
     console.log(`[Preloader] Preloading track ${trackId}`);
+    diagnostics.log('AudioPreloader', 'preload() called', { trackId, url });
     this.currentTrackId = trackId;
     this.currentUrl = url;
     

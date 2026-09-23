@@ -7,6 +7,7 @@ import { prefetchTrackAudio } from '../services/prefetch';
 import { formatDuration } from '../services/audio';
 import { useAudioSettings } from './AudioSettingsContext';
 import { analyzeLoudness, calculateNormalizationGain } from '../services/audioAnalysis';
+import { diagnostics } from '../utils/diagnostics';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -174,6 +175,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const commitMetadata = useCallback((track: Track, project: Project | null) => {
     metadataCommittedRef.current = true;
+    diagnostics.log('PlayerContext', 'commitMetadata', { trackId: track.id, title: track.title, hasMediaSession: 'mediaSession' in navigator });
     if ('mediaSession' in navigator) {
       const coverSrc = project?.coverUrl || track.coverUrl;
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -695,6 +697,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // transition or state resync).  Calling togglePlay here would PAUSE
       // an already-playing track.
       navigator.mediaSession.setActionHandler('play', () => {
+        diagnostics.log('MediaSession', 'action:play', { loading: !!loadingTrackIdRef.current, userPaused: userPausedDuringLoadRef.current });
         console.log('[MediaSession] play action');
         // If a track is loading, clear the pause-during-load flag so it auto-starts
         if (loadingTrackIdRef.current) {
@@ -707,6 +710,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // --- PAUSE handler: MUST be idempotent.  Must never start playback.
       navigator.mediaSession.setActionHandler('pause', () => {
+        diagnostics.log('MediaSession', 'action:pause', { loading: !!loadingTrackIdRef.current });
         console.log('[MediaSession] pause action');
         // If a track is loading, prevent auto-start
         if (loadingTrackIdRef.current) {
@@ -720,10 +724,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // --- PREVIOUS / NEXT: route through PlayerContext queue logic
       navigator.mediaSession.setActionHandler('previoustrack', () => {
+        diagnostics.log('MediaSession', 'action:previoustrack', {});
         console.log('[MediaSession] previoustrack action');
         if (playPreviousRef.current) playPreviousRef.current();
       });
       navigator.mediaSession.setActionHandler('nexttrack', () => {
+        diagnostics.log('MediaSession', 'action:nexttrack', {});
         console.log('[MediaSession] nexttrack action');
         if (playNextRef.current) playNextRef.current();
       });

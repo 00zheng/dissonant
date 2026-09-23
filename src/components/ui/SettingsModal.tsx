@@ -6,9 +6,10 @@ import { useAudioSettings, EQ_PRESETS, PresetName } from '../../context/AudioSet
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenDiagnostics?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onOpenDiagnostics }) => {
   const { settings, updateSettings, resetEQ } = useAudioSettings();
   
   // Local state for dragging smoothness
@@ -166,7 +167,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
 
                 {/* Reset Button */}
-                <div className="flex justify-end mt-4">
+                <div className="flex justify-between items-center mt-4">
+                  <button
+                    onClick={() => onOpenDiagnostics?.()}
+                    className="text-[11px] font-bold uppercase tracking-wider text-[#E8BDB3]/30 hover:text-[#E8BDB3]/60 transition-colors cursor-pointer px-3 py-1.5 rounded-[4px] hover:bg-[#1C1B1B]"
+                  >
+                    Diagnostics
+                  </button>
                   <button
                     onClick={resetEQ}
                     className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#E8BDB3]/50 hover:text-white transition-colors cursor-pointer px-3 py-1.5 rounded-[4px] hover:bg-[#1C1B1B]"

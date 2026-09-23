@@ -19,6 +19,7 @@ import { UploadTrackModal } from './components/ui/UploadTrackModal';
 import { TrackModal } from './components/ui/TrackModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { SettingsModal } from './components/ui/SettingsModal';
+import { DiagnosticsOverlay } from './components/ui/DiagnosticsOverlay';
 import { Folder, Project, Track, ViewMode, RouteState } from './types';
 import { pageViewVariants } from './constants/motion';
 
@@ -100,6 +101,7 @@ export const AppContent: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
 
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
@@ -832,7 +834,14 @@ export const AppContent: React.FC = () => {
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+        onOpenDiagnostics={() => {
+          setSettingsModalOpen(false);
+          setDiagnosticsModalOpen(true);
+        }}
       />
+      {diagnosticsModalOpen && (
+        <DiagnosticsOverlay onClose={() => setDiagnosticsModalOpen(false)} />
+      )}
 
       <FolderModal
         isOpen={folderModalOpen}

@@ -454,3 +454,54 @@ describe('AudioPlayerEngine — Request ID Coordination', () => {
     expect(engine.isIntentionallyPaused()).toBe(false);
   });
 });
+
+describe('AudioPlayerEngine — iOS Lock-Screen & Diagnostics', () => {
+  let engine: InstanceType<typeof import('../playerEngine').AudioPlayerEngine>;
+
+  beforeEach(async () => {
+    const { AudioPlayerEngine } = await import('../playerEngine');
+    engine = new AudioPlayerEngine();
+    mockMediaSessionPlaybackState = 'none';
+  });
+
+  it('keeps Media Session playing after a normal play', () => {
+    engine.loadAndPlaySync('https://example.com/song.mp3');
+    mockAudio.resolvePlay();
+    expect(engine.isPlaying()).toBe(true);
+    expect(mockMediaSessionPlaybackState).toBe('playing');
+  });
+
+  it('keeps Media Session playing when skipping to next track (suppresses intermediate pause)', () => {
+    engine.loadAndPlaySync('https://example.com/song1.mp3');
+    mockAudio.resolvePlay();
+    expect(mockMediaSessionPlaybackState).toBe('playing');
+
+    engine.transitionPause();
+    // During a skip, we pause old audio, but Media Session should NOT say paused
+    expect(mockMediaSessionPlaybackState).toBe('playing');
+
+    engine.loadAndPlaySync('https://example.com/song2.mp3');
+    mockAudio.resolvePlay();
+    expect(mockMediaSessionPlaybackState).toBe('playing');
+  });
+
+  it('reports paused to Media Session on explicit pause', () => {
+    engine.loadAndPlaySync('https://example.com/song1.mp3');
+    mockAudio.resolvePlay();
+    
+    engine.pause();
+    expect(engine.isPlaying()).toBe(false);
+    expect(mockMediaSessionPlaybackState).toBe('paused');
+  });
+
+  it('leaves state honest (paused) when play() fails', async () => {
+    engine.loadAndPlaySync('https://example.com/song1.mp3');
+    // Reject it
+    mockAudio.rejectPlay(new Error('NotAllowedError: play() failed because the user didn\'t interact'));
+    
+    await new Promise(r => setTimeout(r, 0));
+    // Since play rejected and audio is paused, the state should accurately reflect it
+    expect(engine.isPlaying()).toBe(false);
+    // Note: State might have never left 'paused' to begin with
+  });
+});
