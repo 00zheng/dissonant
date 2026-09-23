@@ -20,6 +20,7 @@ export class AudioPlayerEngine {
   private currentTimeState: number = 0;
   private durationState: number = 0;
   private currentSrc: string = '';
+  private currentRequestId: number = 0;
 
   // Web Audio Graph
   private audioCtx: AudioContext | null = null;
@@ -260,7 +261,10 @@ export class AudioPlayerEngine {
   // Public Playback Methods
   // ---------------------------------------------------------------------------
 
-  public async loadAndPlay(src: string, startTime: number = 0): Promise<void> {
+  public async loadAndPlay(src: string, startTime: number = 0, requestId?: number): Promise<void> {
+    const reqId = requestId ?? ++this.currentRequestId;
+    this.currentRequestId = reqId;
+
     if (this.currentSrc !== src) {
       this.clearLoop();
       this.currentSrc = src;
@@ -269,10 +273,13 @@ export class AudioPlayerEngine {
     }
 
     this.audio.currentTime = startTime;
-    await this.play();
+    await this.play(reqId);
   }
 
-  public loadAndPlaySync(src: string, startTime: number = 0): void {
+  public loadAndPlaySync(src: string, startTime: number = 0, requestId?: number): void {
+    const reqId = requestId ?? ++this.currentRequestId;
+    this.currentRequestId = reqId;
+
     if (this.currentSrc !== src) {
       this.clearLoop();
       this.currentSrc = src;
@@ -281,7 +288,7 @@ export class AudioPlayerEngine {
     }
 
     this.audio.currentTime = startTime;
-    this.playSync();
+    this.playSync(reqId);
   }
 
   private configurePlaybackAudioSession() {
@@ -294,7 +301,10 @@ export class AudioPlayerEngine {
     }
   }
 
-  public async play(): Promise<void> {
+  public async play(requestId?: number): Promise<void> {
+    if (requestId !== undefined) this.currentRequestId = requestId;
+    const currentReq = this.currentRequestId;
+
     if (!this.audio.src) return;
 
     this.configurePlaybackAudioSession();
@@ -317,12 +327,19 @@ export class AudioPlayerEngine {
       await this.audio.play();
     } catch (err) {
       console.warn('[Player] audio.play() error:', err);
-      this.isPlayingState = false;
-      this.notifyStateChange();
+      // Only mark paused if this is still the active request AND the element is actually paused.
+      // A newer play() may have already succeeded on a different source.
+      if (this.currentRequestId === currentReq && this.audio.paused) {
+        this.isPlayingState = false;
+        this.notifyStateChange();
+      }
     }
   }
 
-  public playSync(): void {
+  public playSync(requestId?: number): void {
+    if (requestId !== undefined) this.currentRequestId = requestId;
+    const currentReq = this.currentRequestId;
+
     if (!this.audio.src) return;
 
     this.configurePlaybackAudioSession();
@@ -343,13 +360,18 @@ export class AudioPlayerEngine {
     if (playPromise !== undefined) {
       playPromise.catch(err => {
         console.warn('[Player] audio.playSync() error (likely background autoplay policy):', err);
-        this.isPlayingState = false;
-        this.notifyStateChange();
+        // Only mark paused if this is still the active request AND the element is actually paused.
+        if (this.currentRequestId === currentReq && this.audio.paused) {
+          this.isPlayingState = false;
+          this.notifyStateChange();
+        }
       });
     }
   }
 
-  public pause(): void {
+  public pause(requestId?: number): void {
+    const reqId = requestId ?? ++this.currentRequestId;
+    this.currentRequestId = reqId;
     this.audio.pause();
     this.isPlayingState = false;
     this.notifyStateChange();
@@ -536,6 +558,19 @@ export class AudioPlayerEngine {
 
   public getMediaElement(): HTMLAudioElement {
     return this.audio;
+  }
+
+  // --- Request ID coordination for PlayerContext ---
+  public getCurrentRequestId(): number {
+    return this.currentRequestId;
+  }
+
+  public bumpRequestId(): number {
+    return ++this.currentRequestId;
+  }
+
+  public getCurrentSrc(): string {
+    return this.currentSrc;
   }
 }
 

@@ -122,6 +122,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const repeatModeRef = useRef<'off' | 'all' | 'one'>('off');
   const prefetchedUrlRef = useRef<Record<string, string>>({});
   const playRequestIdRef = useRef<number>(0);
+  const loadingTrackIdRef = useRef<string | null>(null);
+  const togglePlayRef = useRef<(() => void) | null>(null);
+  const activeEngineTrackIdRef = useRef<string | null>(null);
+  const isLoadingRef = useRef<boolean>(false);
 
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
@@ -161,7 +165,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentTrack]);
 
   const playResolvedTrack = async (track: Track, trySync: boolean = false) => {
-    const requestId = ++playRequestIdRef.current;
+    const requestId = playerEngine.bumpRequestId();
+    playRequestIdRef.current = requestId;
+    loadingTrackIdRef.current = track.id;
     setCurrentTrack(track);
     setDuration(track.duration || 0);
     setCurrentTime(0);
@@ -169,18 +175,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const cachedUrl = prefetchedUrlRef.current[track.id];
 
     if (cachedUrl) {
+      loadingTrackIdRef.current = null;
       if (trySync) {
-        playerEngine.loadAndPlaySync(cachedUrl);
+        playerEngine.loadAndPlaySync(cachedUrl, 0, requestId);
       } else {
-        playerEngine.loadAndPlay(cachedUrl);
+        playerEngine.loadAndPlay(cachedUrl, 0, requestId);
       }
     } else {
-      playerEngine.pause(); // Pause old audio immediately to avoid hearing it during load
+      playerEngine.pause(requestId); // Pause old audio immediately to avoid hearing it during load
       const url = await resolvePlayableTrack(track);
-      if (playRequestIdRef.current !== requestId) return; // Stale request check
+      if (playRequestIdRef.current !== requestId) {
+        // A newer command took over — abandon this one
+        if (loadingTrackIdRef.current === track.id) {
+          loadingTrackIdRef.current = null;
+        }
+        return;
+      }
       
+      loadingTrackIdRef.current = null;
       if (url) {
-        playerEngine.loadAndPlay(url);
+        playerEngine.loadAndPlay(url, 0, requestId);
       } else {
         console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
         setIsPlaying(false);
@@ -374,6 +388,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     if (currentTrackRef.current?.id === track.id) {
+      // If the track is still loading its URL, ignore the tap — don't toggle old audio
+      if (loadingTrackIdRef.current === track.id) {
+        return;
+      }
       playerEngine.togglePlay();
       return;
     }
@@ -405,19 +423,27 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!currentTrackRef.current || currentTrackRef.current.hasAudio === false) {
       return;
     }
+
+    // If a track is loading its URL, don't toggle the old audio
+    if (loadingTrackIdRef.current) {
+      return;
+    }
     
     // If we're toggling play and audio src isn't set, we might need to resolve it
     const mediaEl = playerEngine.getMediaElement();
     if (!mediaEl.src || mediaEl.src.endsWith(window.location.host + '/')) {
+        const requestId = playerEngine.bumpRequestId();
+        playRequestIdRef.current = requestId;
         const url = await resolvePlayableTrack(currentTrackRef.current);
+        if (playRequestIdRef.current !== requestId) return; // Stale — a newer command took over
         if (url) {
-            playerEngine.loadAndPlay(url, currentTime);
+            playerEngine.loadAndPlay(url, playerEngine.getCurrentTime(), requestId);
             return;
         }
     }
     
     playerEngine.togglePlay();
-  }, [currentTime]);
+  }, []);
 
   const seek = useCallback((seconds: number) => {
     playerEngine.seek(seconds);
@@ -554,13 +580,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     playNextRef.current = playNext;
     playPreviousRef.current = playPrevious;
-  }, [playNext, playPrevious]);
+    togglePlayRef.current = togglePlay;
+  }, [playNext, playPrevious, togglePlay]);
 
   useEffect(() => {
     const registerMediaSessionActions = () => {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.setActionHandler('play', () => {
-          playerEngine.play();
+          // Route through PlayerContext to handle URL resolution if needed
+          if (togglePlayRef.current) {
+            togglePlayRef.current();
+          } else {
+            playerEngine.play();
+          }
         });
         navigator.mediaSession.setActionHandler('pause', () => {
           playerEngine.pause();
