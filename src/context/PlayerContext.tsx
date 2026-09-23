@@ -126,6 +126,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const togglePlayRef = useRef<(() => void) | null>(null);
   const activeEngineTrackIdRef = useRef<string | null>(null);
   const isLoadingRef = useRef<boolean>(false);
+  // Set when the user explicitly pauses while a URL is resolving.
+  // Checked after resolution to prevent unwanted auto-start.
+  const userPausedDuringLoadRef = useRef<boolean>(false);
+  // Track the last track ID whose load/play failed, enabling retry on same tap.
+  const lastFailedTrackIdRef = useRef<string | null>(null);
+  // Whether currentTrack metadata has been committed (URL resolved, play started).
+  // Prevents premature Media Session metadata push during async resolution.
+  const metadataCommittedRef = useRef<boolean>(false);
 
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
@@ -168,37 +176,78 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const requestId = playerEngine.bumpRequestId();
     playRequestIdRef.current = requestId;
     loadingTrackIdRef.current = track.id;
-    setCurrentTrack(track);
+    userPausedDuringLoadRef.current = false;
+    lastFailedTrackIdRef.current = null;
+    metadataCommittedRef.current = false;
+
+    // Set duration/time immediately for UI responsiveness, but DON'T set
+    // currentTrack yet when we need async resolution — that would push
+    // the new song's title to Media Session before audio is ready.
     setDuration(track.duration || 0);
     setCurrentTime(0);
 
     const cachedUrl = prefetchedUrlRef.current[track.id];
 
     if (cachedUrl) {
+      // Fast path: URL is already resolved.  Commit metadata immediately.
       loadingTrackIdRef.current = null;
+      metadataCommittedRef.current = true;
+      setCurrentTrack(track);
+      activeEngineTrackIdRef.current = track.id;
       if (trySync) {
         playerEngine.loadAndPlaySync(cachedUrl, 0, requestId);
       } else {
         playerEngine.loadAndPlay(cachedUrl, 0, requestId);
       }
     } else {
-      playerEngine.pause(requestId); // Pause old audio immediately to avoid hearing it during load
+      // Slow path: need async URL resolution.
+      // Use transitionPause (not pause) to silence old audio without
+      // flashing "Paused" on the iOS lock screen.
+      playerEngine.transitionPause();
+
+      // Show the pending track in the in-app UI, but mark metadata as
+      // uncommitted so the Media Session effect skips this update.
+      setCurrentTrack(track);
+
+      console.log(`[Player] Resolving URL for "${track.title}" (reqId=${requestId})`);
       const url = await resolvePlayableTrack(track);
+
       if (playRequestIdRef.current !== requestId) {
         // A newer command took over — abandon this one
+        console.log(`[Player] Abandoned stale resolution (reqId=${requestId}, current=${playRequestIdRef.current})`);
         if (loadingTrackIdRef.current === track.id) {
           loadingTrackIdRef.current = null;
         }
         return;
       }
-      
+
       loadingTrackIdRef.current = null;
-      if (url) {
-        playerEngine.loadAndPlay(url, 0, requestId);
-      } else {
+
+      if (!url) {
         console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
+        lastFailedTrackIdRef.current = track.id;
         setIsPlaying(false);
+        return;
       }
+
+      // User may have pressed Pause while we were resolving
+      if (userPausedDuringLoadRef.current) {
+        console.log('[Player] User paused during URL resolution — not auto-starting');
+        // Still set the src so a subsequent Play will work
+        activeEngineTrackIdRef.current = track.id;
+        metadataCommittedRef.current = true;
+        // Load the source but don't play
+        const mediaEl = playerEngine.getMediaElement();
+        if (playerEngine.getCurrentSrc() !== url) {
+          mediaEl.src = url;
+        }
+        return;
+      }
+
+      // Commit metadata now that we're about to start playback
+      metadataCommittedRef.current = true;
+      activeEngineTrackIdRef.current = track.id;
+      playerEngine.loadAndPlay(url, 0, requestId);
     }
   };
 
@@ -388,10 +437,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     if (currentTrackRef.current?.id === track.id) {
-      // If the track is still loading its URL, ignore the tap — don't toggle old audio
+      // If the track is still loading its URL, the user tapping it again
+      // means "I'm waiting, keep going" — don't toggle old audio.
       if (loadingTrackIdRef.current === track.id) {
+        console.log('[Player] Track is still loading — tap ignored');
         return;
       }
+
+      // If the previous attempt for this same track FAILED, retry it
+      // instead of toggling (which would do nothing useful since the src
+      // was never set).  This fixes the "must select another song first" bug.
+      if (lastFailedTrackIdRef.current === track.id) {
+        console.log(`[Player] Retrying previously failed track "${track.title}"`);
+        lastFailedTrackIdRef.current = null;
+        playResolvedTrack(track, true);
+        return;
+      }
+
+      // Also retry if the audio element has no valid src (cold state)
+      const mediaEl = playerEngine.getMediaElement();
+      if (!mediaEl.src || mediaEl.src === window.location.href || mediaEl.src === window.location.origin + '/') {
+        console.log('[Player] Audio element has no src — re-resolving');
+        playResolvedTrack(track, false);
+        return;
+      }
+
       playerEngine.togglePlay();
       return;
     }
@@ -424,14 +494,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // If a track is loading its URL, don't toggle the old audio
+    // If a track is loading its URL:
+    // - If user is pausing → set the flag so auto-start is suppressed
+    // - If user is playing → let the load continue (it will auto-start)
     if (loadingTrackIdRef.current) {
+      // During loading, the only meaningful toggle is "cancel auto-start"
+      if (!userPausedDuringLoadRef.current) {
+        userPausedDuringLoadRef.current = true;
+        setIsPlaying(false);
+        console.log('[Player] User paused during URL loading');
+      } else {
+        // They paused during load, now pressing play again → clear the flag
+        userPausedDuringLoadRef.current = false;
+        console.log('[Player] User resumed during URL loading — will auto-start');
+      }
       return;
     }
     
     // If we're toggling play and audio src isn't set, we might need to resolve it
     const mediaEl = playerEngine.getMediaElement();
-    if (!mediaEl.src || mediaEl.src.endsWith(window.location.host + '/')) {
+    if (!mediaEl.src || mediaEl.src === window.location.href || mediaEl.src === window.location.origin + '/') {
         const requestId = playerEngine.bumpRequestId();
         playRequestIdRef.current = requestId;
         const url = await resolvePlayableTrack(currentTrackRef.current);
@@ -584,45 +666,61 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [playNext, playPrevious, togglePlay]);
 
   useEffect(() => {
-    const registerMediaSessionActions = () => {
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => {
-          // Route through PlayerContext to handle URL resolution if needed
-          if (togglePlayRef.current) {
-            togglePlayRef.current();
-          } else {
-            playerEngine.play();
-          }
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          playerEngine.pause();
-        });
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-          if (playPreviousRef.current) playPreviousRef.current();
-        });
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-          if (playNextRef.current) playNextRef.current();
-        });
-        
-        // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
-        try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
-        try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
-      }
-    };
+    if ('mediaSession' in navigator) {
+      // --- PLAY handler: MUST be idempotent.  On iOS the lock-screen fires
+      // 'play' even when audio is already playing (e.g. after a brief
+      // transition or state resync).  Calling togglePlay here would PAUSE
+      // an already-playing track.
+      navigator.mediaSession.setActionHandler('play', () => {
+        console.log('[MediaSession] play action');
+        // If a track is loading, clear the pause-during-load flag so it auto-starts
+        if (loadingTrackIdRef.current) {
+          userPausedDuringLoadRef.current = false;
+          return;
+        }
+        // Idempotent: only starts if not already playing
+        playerEngine.idempotentPlay();
+      });
 
-    const mediaEl = playerEngine.getMediaElement();
-    mediaEl.addEventListener('playing', registerMediaSessionActions);
+      // --- PAUSE handler: MUST be idempotent.  Must never start playback.
+      navigator.mediaSession.setActionHandler('pause', () => {
+        console.log('[MediaSession] pause action');
+        // If a track is loading, prevent auto-start
+        if (loadingTrackIdRef.current) {
+          userPausedDuringLoadRef.current = true;
+          setIsPlaying(false);
+          return;
+        }
+        // Idempotent: only pauses if currently playing
+        playerEngine.idempotentPause();
+      });
 
-    // Initial registration just in case
-    registerMediaSessionActions();
+      // --- PREVIOUS / NEXT: route through PlayerContext queue logic
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        console.log('[MediaSession] previoustrack action');
+        if (playPreviousRef.current) playPreviousRef.current();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        console.log('[MediaSession] nexttrack action');
+        if (playNextRef.current) playNextRef.current();
+      });
+
+      // Explicitly remove seek handlers to ensure OS shows Previous/Next track instead of +/- 10s
+      try { navigator.mediaSession.setActionHandler('seekbackward', null); } catch (e) {}
+      try { navigator.mediaSession.setActionHandler('seekforward', null); } catch (e) {}
+    }
 
     return () => {
-      mediaEl.removeEventListener('playing', registerMediaSessionActions);
+      // Cleanup not strictly needed for mediaSession but good practice
     };
   }, []);
 
   useEffect(() => {
-    if ('mediaSession' in navigator && currentTrack) {
+    // Only push metadata to Media Session when it's been committed
+    // (URL resolved, playback starting).  During the async resolution
+    // phase, metadataCommittedRef is false, so the lock screen keeps
+    // the PREVIOUS track's metadata until the new one is actually ready.
+    if ('mediaSession' in navigator && currentTrack && metadataCommittedRef.current) {
       const coverSrc = currentProject?.coverUrl || currentTrack.coverUrl;
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title || 'Unknown Title',

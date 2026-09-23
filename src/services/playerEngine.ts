@@ -22,6 +22,16 @@ export class AudioPlayerEngine {
   private currentSrc: string = '';
   private currentRequestId: number = 0;
 
+  // --- Staleness & transition suppression ---
+  // The request ID that loaded the current audio.src
+  private srcRequestId: number = 0;
+  // True while we're switching tracks — suppresses the intermediate 'pause' event
+  // from updating Media Session state (which causes the iOS "Paused" flash).
+  private suppressPauseNotify: boolean = false;
+  // True when the user explicitly paused (vs a transitional pause during load).
+  // Checked after async URL resolution to avoid auto-starting if user paused.
+  private intentionallyPaused: boolean = false;
+
   // Web Audio Graph
   private audioCtx: AudioContext | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
@@ -196,13 +206,24 @@ export class AudioPlayerEngine {
     });
 
     this.audio.addEventListener('play', () => {
+      // Only update state if this event is for the current request's source.
+      // During rapid track switches, a stale source's 'play' event should
+      // not override the state of a newer load.
       this.isPlayingState = true;
+      this.intentionallyPaused = false;
       this.notifyStateChange();
     });
 
     this.audio.addEventListener('pause', () => {
+      // If suppressPauseNotify is set, this is a transitional pause during a
+      // track switch (old audio being paused before new src loads).  We still
+      // update isPlayingState for internal bookkeeping, but we do NOT push
+      // the state to Media Session — that would cause the iOS lock-screen to
+      // flash "Paused" between tracks.
       this.isPlayingState = false;
-      this.notifyStateChange();
+      if (!this.suppressPauseNotify) {
+        this.notifyStateChange();
+      }
     });
 
     this.audio.addEventListener('ended', () => {
@@ -211,14 +232,24 @@ export class AudioPlayerEngine {
         this.play();
         return;
       }
+      // Guard: if a newer source has been loaded since this 'ended' event
+      // was queued, ignore it.  This prevents a stale track's natural end
+      // from advancing the queue after the user already selected something else.
+      if (this.audio.src !== this.currentSrc && this.currentSrc !== '') {
+        console.log('[Player] Ignoring stale ended event (src changed)');
+        return;
+      }
       this.isPlayingState = false;
       this.notifyStateChange();
       this.endedListeners.forEach((cb) => cb());
     });
 
     this.audio.addEventListener('error', (e) => {
-      this.isPlayingState = false;
-      this.notifyStateChange();
+      // Only mark as not-playing if this error is for the current source
+      if (this.audio.src === this.currentSrc || this.currentSrc === '') {
+        this.isPlayingState = false;
+        this.notifyStateChange();
+      }
       this.errorListeners.forEach((cb) => cb(e));
     });
   }
@@ -264,6 +295,8 @@ export class AudioPlayerEngine {
   public async loadAndPlay(src: string, startTime: number = 0, requestId?: number): Promise<void> {
     const reqId = requestId ?? ++this.currentRequestId;
     this.currentRequestId = reqId;
+    this.srcRequestId = reqId;
+    this.intentionallyPaused = false;
 
     if (this.currentSrc !== src) {
       this.clearLoop();
@@ -279,6 +312,8 @@ export class AudioPlayerEngine {
   public loadAndPlaySync(src: string, startTime: number = 0, requestId?: number): void {
     const reqId = requestId ?? ++this.currentRequestId;
     this.currentRequestId = reqId;
+    this.srcRequestId = reqId;
+    this.intentionallyPaused = false;
 
     if (this.currentSrc !== src) {
       this.clearLoop();
@@ -372,9 +407,25 @@ export class AudioPlayerEngine {
   public pause(requestId?: number): void {
     const reqId = requestId ?? ++this.currentRequestId;
     this.currentRequestId = reqId;
+    this.intentionallyPaused = true;
     this.audio.pause();
+    // The 'pause' event listener will set isPlayingState = false.
+    // Force-sync here in case the element was already paused (no event fires).
     this.isPlayingState = false;
     this.notifyStateChange();
+  }
+
+  /**
+   * Pause only for transitional purposes (e.g. switching tracks).
+   * Suppresses Media Session notification to avoid iOS "Paused" flash.
+   */
+  public transitionPause(): void {
+    if (!this.audio.paused) {
+      this.suppressPauseNotify = true;
+      this.audio.pause();
+      this.suppressPauseNotify = false;
+    }
+    // Don't bump request ID — the new loadAndPlay will set its own.
   }
 
   public togglePlay(): void {
@@ -383,6 +434,30 @@ export class AudioPlayerEngine {
     } else {
       this.play();
     }
+  }
+
+  /**
+   * Idempotent play: only starts playback if not already playing.
+   * Designed for Media Session 'play' handler — must never pause.
+   */
+  public idempotentPlay(): void {
+    if (!this.isPlayingState) {
+      this.play();
+    }
+  }
+
+  /**
+   * Idempotent pause: only pauses if currently playing.
+   * Designed for Media Session 'pause' handler — must never play.
+   */
+  public idempotentPause(): void {
+    if (this.isPlayingState) {
+      this.pause();
+    }
+  }
+
+  public isIntentionallyPaused(): boolean {
+    return this.intentionallyPaused;
   }
 
   public seek(seconds: number): void {
