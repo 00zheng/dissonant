@@ -268,9 +268,6 @@ export class AudioPlayerEngine {
       this.audio.src = src;
     }
 
-    this.audio.pause();
-    this.isPlayingState = false;
-
     this.audio.currentTime = startTime;
     await this.play();
   }
@@ -282,9 +279,6 @@ export class AudioPlayerEngine {
       this.currentTimeState = startTime;
       this.audio.src = src;
     }
-
-    this.audio.pause();
-    this.isPlayingState = false;
 
     this.audio.currentTime = startTime;
     this.playSync();
@@ -323,6 +317,8 @@ export class AudioPlayerEngine {
       await this.audio.play();
     } catch (err) {
       console.warn('[Player] audio.play() error:', err);
+      this.isPlayingState = false;
+      this.notifyStateChange();
     }
   }
 
@@ -347,6 +343,8 @@ export class AudioPlayerEngine {
     if (playPromise !== undefined) {
       playPromise.catch(err => {
         console.warn('[Player] audio.playSync() error (likely background autoplay policy):', err);
+        this.isPlayingState = false;
+        this.notifyStateChange();
       });
     }
   }

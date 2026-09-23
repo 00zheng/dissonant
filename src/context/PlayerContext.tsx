@@ -121,6 +121,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const historyRef = useRef<Track[]>([]);
   const repeatModeRef = useRef<'off' | 'all' | 'one'>('off');
   const prefetchedUrlRef = useRef<Record<string, string>>({});
+  const playRequestIdRef = useRef<number>(0);
 
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
@@ -160,6 +161,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [currentTrack]);
 
   const playResolvedTrack = async (track: Track, trySync: boolean = false) => {
+    const requestId = ++playRequestIdRef.current;
     setCurrentTrack(track);
     setDuration(track.duration || 0);
     setCurrentTime(0);
@@ -173,7 +175,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         playerEngine.loadAndPlay(cachedUrl);
       }
     } else {
+      playerEngine.pause(); // Pause old audio immediately to avoid hearing it during load
       const url = await resolvePlayableTrack(track);
+      if (playRequestIdRef.current !== requestId) return; // Stale request check
+      
       if (url) {
         playerEngine.loadAndPlay(url);
       } else {
@@ -387,17 +392,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
     
-    setCurrentTrack(track);
-    setDuration(track.duration || 0);
-    setCurrentTime(0);
-
-    const url = await resolvePlayableTrack(track);
-    if (url) {
-      playerEngine.loadAndPlay(url);
-    } else {
-      console.warn(`[Player] Failed to resolve playable URL for track ${track.id}`);
-      setIsPlaying(false);
-    }
+    playResolvedTrack(track, true); // trySync is true since it's a direct user tap
   }, []);
 
   const updateCurrentProject = useCallback((project: Project) => {
